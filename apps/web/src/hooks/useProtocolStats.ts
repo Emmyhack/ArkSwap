@@ -16,6 +16,13 @@ export type PoolSummary = {
   reserve1: bigint;
 };
 
+/** Converts a raw amount between decimal scales without losing exactness. */
+function rescale(raw: bigint, from: number, to: number): bigint {
+  if (from === to) return raw;
+  if (from > to) return raw / 10n ** BigInt(from - to);
+  return raw * 10n ** BigInt(to - from);
+}
+
 function tokenByAddress(address?: Address): Token | undefined {
   if (!address) return undefined;
   return TOKEN_LIST.find((t) => t.address?.toLowerCase() === address.toLowerCase());
@@ -81,9 +88,16 @@ export function useProtocolStats() {
     });
   }
 
-  // Total WKASH locked across every pool that holds it.
-  let kashLocked = 0n;
-  let stablesLocked = 0n;
+  // Totals are accumulated in each token's OWN decimals before being combined.
+  //
+  // Summing raw reserve integers across tokens is meaningless once the registry
+  // holds more than one decimal layout: an 18-decimal mock contributes a number
+  // 10^12 times larger than a 6-decimal one for the same real value, which is
+  // exactly how this figure first rendered as 5.2e17 "mUSD".
+  const STABLE_SCALE = 6;
+  let kashLocked = 0n; // 18 decimals
+  let stablesLocked = 0n; // normalised to 6 decimals
+
   for (const p of pools) {
     const sides: Array<[Token | undefined, bigint]> = [
       [p.token0, p.reserve0],
@@ -93,13 +107,17 @@ export function useProtocolStats() {
       if (!token) continue;
       if (WKASH_ADDRESS && token.address?.toLowerCase() === WKASH_ADDRESS.toLowerCase()) {
         kashLocked += reserve;
-      } else if (token.isDevnetMock) {
-        stablesLocked += reserve;
+        continue;
+      }
+      // Only tokens the manifest marks stable are counted as dollars. Adding
+      // mWBTC here would value one bitcoin at one dollar.
+      if (token.isStable) {
+        stablesLocked += rescale(reserve, token.decimals, STABLE_SCALE);
       }
     }
   }
 
-  return {pools, poolCount: count, kashLocked, stablesLocked};
+  return {pools, poolCount: count, kashLocked, stablesLocked, tokenCount: TOKEN_LIST.length};
 }
 
 /**

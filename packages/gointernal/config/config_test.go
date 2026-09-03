@@ -4,6 +4,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -21,8 +22,23 @@ func TestLoadReadsTheRealDeploymentManifest(t *testing.T) {
 	if m.Factory == "" || m.WKASH == "" {
 		t.Fatalf("manifest is missing factory/wkash: %+v", m)
 	}
-	if _, ok := m.Tokens["mUSDC"]; !ok {
+	usdc, ok := m.Tokens["mUSDC"]
+	if !ok {
 		t.Fatalf("manifest tokens missing mUSDC: %+v", m.Tokens)
+	}
+	if usdc.Decimals != 6 || !usdc.IsStable {
+		t.Fatalf("mUSDC metadata wrong: %+v", usdc)
+	}
+	// A non-stable asset must not be picked up as a USD anchor.
+	wbtc, ok := m.Tokens["mWBTC"]
+	if !ok {
+		t.Fatalf("manifest tokens missing mWBTC")
+	}
+	if wbtc.Decimals != 8 {
+		t.Fatalf("mWBTC decimals = %d, want 8", wbtc.Decimals)
+	}
+	if wbtc.IsStable {
+		t.Fatal("mWBTC must not be marked stable")
 	}
 }
 
@@ -86,4 +102,32 @@ func TestLoadRejectsNonNumericChainID(t *testing.T) {
 		t.Fatal("expected a non-numeric chain id to be rejected")
 	}
 	os.Unsetenv("ARK_EVM_CHAIN_ID")
+}
+
+// Only tokens explicitly flagged in the manifest may act as USD anchors.
+// Picking up every listed token would make mWBTC worth $1 and corrupt TVL.
+func TestOnlyFlaggedTokensBecomeStablecoins(t *testing.T) {
+	c, err := Load(filepath.Join("..", "..", "addresses", "ark-devnet.json"))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	m, err := LoadManifest(filepath.Join("..", "..", "addresses", "ark-devnet.json"))
+	if err != nil {
+		t.Fatalf("LoadManifest: %v", err)
+	}
+
+	stable := map[string]bool{}
+	for _, a := range c.StablecoinAddresses {
+		stable[a] = true
+	}
+	for sym, tk := range m.Tokens {
+		want := tk.IsStable
+		got := stable[strings.ToLower(tk.Address)]
+		if got != want {
+			t.Errorf("%s: treated as stablecoin=%v, manifest says isStable=%v", sym, got, want)
+		}
+	}
+	if len(c.StablecoinAddresses) == 0 {
+		t.Fatal("no stablecoins configured; pricing would have no USD anchor")
+	}
 }

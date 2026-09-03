@@ -21,13 +21,57 @@
   "feeTo": "0x0000000000000000000000000000000000000000",
   "pairInitCodeHash": "0x30820c342fc28c16c80e536d138c0c5290a90de3583c2a126a9e19b519432e74",
   "tokens": {
-    "mUSDC": "0xC8d15f9A42Ee3107ab1257E38199e3Bf899dCfB3",
-    "mUSDT": "0x073D643F712C136D2e7F71d683d9E26b6EFC845b"
+    "mUSDC": {
+      "address": "0xC8d15f9A42Ee3107ab1257E38199e3Bf899dCfB3",
+      "name": "Mock USD Coin (Ark Devnet)",
+      "decimals": 6,
+      "isDevnetMock": true,
+      "isStable": true
+    },
+    "mUSDT": {
+      "address": "0x073D643F712C136D2e7F71d683d9E26b6EFC845b",
+      "name": "Mock Tether USD (Ark Devnet)",
+      "decimals": 6,
+      "isDevnetMock": true,
+      "isStable": true
+    },
+    "mWETH": {
+      "address": "0x9D547772ddA2FEfD5FDFBD0eb26b6F929AC48737",
+      "name": "Mock Wrapped Ether (Ark Devnet)",
+      "decimals": 18,
+      "isDevnetMock": true,
+      "isStable": false
+    },
+    "mWBTC": {
+      "address": "0xB30dB5f5949462D6f9cC8c0Fd4494c71D986Fb89",
+      "name": "Mock Wrapped Bitcoin (Ark Devnet)",
+      "decimals": 8,
+      "isDevnetMock": true,
+      "isStable": false
+    },
+    "mDAI": {
+      "address": "0xfDbb78f6D62f6111c8B4550f0fA8bffE51D805a1",
+      "name": "Mock Dai (Ark Devnet)",
+      "decimals": 18,
+      "isDevnetMock": true,
+      "isStable": true
+    },
+    "mLINK": {
+      "address": "0x4Ba45572C2e99926dD18E7B32f4D607d4c4C213a",
+      "name": "Mock Chainlink (Ark Devnet)",
+      "decimals": 18,
+      "isDevnetMock": true,
+      "isStable": false
+    }
   },
   "pairs": {
     "WKASH_mUSDC": "0x022850A98a241FF9E3978Cd1B596295cF1451719",
     "WKASH_mUSDT": "0x5575dB26621DEe45d6067D647c58648F98DCf160",
-    "mUSDC_mUSDT": "0x6120C976169e4fEcfD7b5ab1C024f4015a60daB4"
+    "mUSDC_mUSDT": "0x6120C976169e4fEcfD7b5ab1C024f4015a60daB4",
+    "mWETH_mUSDC": "0x7D38289E0a77Bda7DD0B6E4aEda0E87A8705C192",
+    "mWBTC_mUSDC": "0x68F7911051F51Fa87f31Cf46513739741c5C2fcF",
+    "mDAI_mUSDC": "0x779F598Ed59717af84b69b9b4Dc1fb66919089Bc",
+    "mLINK_mUSDC": "0x0b5d67D8f341fCc4C440019151E290d38DdAD00E"
   },
   "deployments": {
     "deployer": "0x4FEA262782b5BE34B18cf24b6aC026215899EEc0",
@@ -64,7 +108,8 @@
     "wkash": true,
     "pairs": false,
     "pairsNote": "Blockscout cannot verify the pairs: the Ark devnet node exposes no trace API (debug_traceTransaction / trace_transaction / debug_traceBlockByNumber / trace_block all return 'does not exist/is not available'), so Blockscout's internal-transaction fetcher never sees the factory's CREATE2 call, records no creation, and rejects verification server-side with 'The address is not a smart contract'. Not a contract defect. Attested by bytecode instead: all three pairs carry runtime code byte-identical to the compiled ArkSwapPair, keccak256 0x2ecfe3b325ceceff28477c0c7f82692713e4c2e8d08a11d1ffc535c19af1d75f. Reproduce with `make verify-pairs-local`; run `make verify-pairs` once node tracing is enabled.",
-    "pairsRuntimeBytecodeHash": "0x2ecfe3b325ceceff28477c0c7f82692713e4c2e8d08a11d1ffc535c19af1d75f"
+    "pairsRuntimeBytecodeHash": "0x2ecfe3b325ceceff28477c0c7f82692713e4c2e8d08a11d1ffc535c19af1d75f",
+    "mocks": "mUSDC and mUSDT verified; mWETH/mWBTC/mDAI/mLINK pending (same MockERC20 source)"
   },
   "liveChecks": {
     "chainIdMatches": true,
@@ -82,5 +127,9 @@
     "upstreamPeriphery": "https://github.com/Uniswap/v2-periphery",
     "semanticChanges": "see docs/UPSTREAM-DIFF.md",
     "protocolFeeEnabled": false
-  }
+  },
+  "routingHubs": [
+    "mUSDC",
+    "WKASH"
+  ]
 }

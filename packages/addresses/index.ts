@@ -13,6 +13,17 @@ import arkDevnet from './ark-devnet.json';
  */
 export type Address = `0x${string}`;
 
+/** A token entry in a deployment manifest, carrying its own metadata. */
+export type TokenEntry = {
+  address: Address;
+  name: string;
+  decimals: number;
+  /** Devnet fixture with unrestricted minting and no value (llm.txt s15). */
+  isDevnetMock: boolean;
+  /** Explicitly approved USD anchor. Never inferred from symbol text (llm.txt s23). */
+  isStable: boolean;
+};
+
 export type Deployment = {
   network: string;
   evmChainId: string;
@@ -25,7 +36,9 @@ export type Deployment = {
   feeToSetter: Address;
   feeTo: Address;
   pairInitCodeHash: Address;
-  tokens: Record<string, Address>;
+  tokens: Record<string, TokenEntry>;
+  /** Preferred intermediate tokens when no direct pair exists. */
+  routingHubs?: string[];
   pairs: Record<string, Address>;
   deployments: Record<string, unknown>;
   compiler: Record<string, unknown>;

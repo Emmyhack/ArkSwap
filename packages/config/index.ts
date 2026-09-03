@@ -56,20 +56,14 @@ export function chainConfig(chainId: number): ChainConfig | undefined {
 }
 
 /**
- * Token registry for a chain, derived from its deployment record.
+ * Token registry for a chain, derived entirely from its deployment record.
  *
- * `isStable` comes from an explicit allowlist keyed on the deployment's own
- * token map — never inferred from symbol text, which llm.txt s23 forbids because
- * any token can claim to be called "USDC".
+ * Symbols, names, decimals and the stable/mock flags all come from the manifest,
+ * so listing a new asset is a deployment concern rather than a code change. That
+ * matters for `isStable` in particular: llm.txt s23 forbids inferring stability
+ * from symbol text, and a hardcoded allowlist in this file would quietly go
+ * stale the moment a new token was deployed.
  */
-const STABLE_KEYS = new Set(['mUSDC', 'mUSDT']);
-const DEVNET_MOCK_KEYS = new Set(['mUSDC', 'mUSDT']);
-const TOKEN_NAMES: Record<string, string> = {
-  mUSDC: 'Mock USD Coin (Ark Devnet)',
-  mUSDT: 'Mock Tether USD (Ark Devnet)',
-};
-const TOKEN_DECIMALS: Record<string, number> = {mUSDC: 6, mUSDT: 6};
-
 export function tokenRegistry(chainId: number): TokenConfig[] {
   const d: Deployment | undefined = getDeployment(chainId);
   if (!d) return [];
@@ -82,17 +76,30 @@ export function tokenRegistry(chainId: number): TokenConfig[] {
     isWkash: true,
   };
 
-  const mocks: TokenConfig[] = Object.entries(d.tokens ?? {}).map(([key, address]) => ({
-    address,
-    symbol: key,
-    name: TOKEN_NAMES[key] ?? key,
-    decimals: TOKEN_DECIMALS[key] ?? 18,
-    isDevnetMock: DEVNET_MOCK_KEYS.has(key),
-    isStable: STABLE_KEYS.has(key),
-    warning: DEVNET_MOCK_KEYS.has(key) ? DEVNET_WARNING : undefined,
+  const listed: TokenConfig[] = Object.entries(d.tokens ?? {}).map(([symbol, t]) => ({
+    address: t.address,
+    symbol,
+    name: t.name,
+    decimals: t.decimals,
+    isDevnetMock: t.isDevnetMock,
+    isStable: t.isStable,
+    warning: t.isDevnetMock ? DEVNET_WARNING : undefined,
   }));
 
-  return [KASH, wkash, ...mocks];
+  return [KASH, wkash, ...listed];
+}
+
+/**
+ * Intermediate tokens the UI may route through when two assets have no direct
+ * pair. Ordered by preference; falls back to WKASH, which every chain has.
+ */
+export function routingHubs(chainId: number): TokenConfig[] {
+  const d = getDeployment(chainId);
+  const registry = tokenRegistry(chainId);
+  const names = d?.routingHubs?.length ? d.routingHubs : ['WKASH'];
+  return names
+    .map((n) => registry.find((t) => t.symbol === n))
+    .filter((t): t is TokenConfig => Boolean(t));
 }
 
 /** The 0.30% ArkSwap trade fee, in basis points. Pinned by the contracts. */

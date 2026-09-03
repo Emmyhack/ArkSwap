@@ -48,13 +48,28 @@ type Config struct {
 // needs. Reading the manifest is what keeps canonical addresses from being
 // duplicated by hand across web, api and indexer.
 type Manifest struct {
-	EVMChainID string            `json:"evmChainId"`
-	WKASH      string            `json:"wkash"`
-	Factory    string            `json:"factory"`
-	Tokens     map[string]string `json:"tokens"`
+	EVMChainID  string                 `json:"evmChainId"`
+	WKASH       string                 `json:"wkash"`
+	Factory     string                 `json:"factory"`
+	Tokens      map[string]ManifestToken `json:"tokens"`
+	RoutingHubs []string               `json:"routingHubs"`
 	Deployments struct {
 		FactoryBlock json.Number `json:"factoryBlock"`
 	} `json:"deployments"`
+}
+
+// ManifestToken carries a listed token's metadata.
+//
+// IsStable travels with the deployment record rather than living in a hardcoded
+// allowlist, so listing a new asset never requires a code change. llm.txt s23
+// forbids inferring stability from symbol text, and a constant in this file
+// would go stale the moment a token was added.
+type ManifestToken struct {
+	Address      string `json:"address"`
+	Name         string `json:"name"`
+	Decimals     int    `json:"decimals"`
+	IsDevnetMock bool   `json:"isDevnetMock"`
+	IsStable     bool   `json:"isStable"`
 }
 
 // LoadManifest reads a deployment manifest from packages/addresses.
@@ -103,8 +118,11 @@ func Load(manifestPath string) (*Config, error) {
 		if b, err := m.Deployments.FactoryBlock.Int64(); err == nil && b > 0 {
 			c.FactoryDeployBlock = uint64(b)
 		}
-		for _, addr := range m.Tokens {
-			c.StablecoinAddresses = append(c.StablecoinAddresses, strings.ToLower(addr))
+		// Only tokens the manifest explicitly marks stable become USD anchors.
+		for _, t := range m.Tokens {
+			if t.IsStable {
+				c.StablecoinAddresses = append(c.StablecoinAddresses, strings.ToLower(t.Address))
+			}
 		}
 	}
 

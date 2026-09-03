@@ -14,7 +14,7 @@ import {formatAmount} from '@/lib/format';
  * what the factory and pairs can answer right now.
  */
 export function StatsSection() {
-  const {poolCount, kashLocked, stablesLocked} = useProtocolStats();
+  const {poolCount, kashLocked, stablesLocked, tokenCount} = useProtocolStats();
 
   return (
     <section className="section">
@@ -56,17 +56,17 @@ export function StatsSection() {
             </span>
           </div>
           <div className="stat">
-            <span className="stat__label">Test stablecoins locked</span>
+            <span className="stat__label">Stablecoin liquidity</span>
             <span className="stat__value">
               {formatAmount(stablesLocked, 6, 0)}
               <span className="stat__unit">mUSD</span>
             </span>
           </div>
           <div className="stat">
-            <span className="stat__label">EVM chain</span>
+            <span className="stat__label">Tokens listed</span>
             <span className="stat__value">
-              {ARK_CHAIN_ID || '—'}
-              <span className="stat__unit">devnet</span>
+              {tokenCount}
+              <span className="stat__unit">chain {ARK_CHAIN_ID || '—'}</span>
             </span>
           </div>
         </div>

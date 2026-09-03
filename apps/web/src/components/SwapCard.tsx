@@ -6,20 +6,12 @@ import {useAccount, useWaitForTransactionReceipt, useWriteContract} from 'wagmi'
 import {routerAbi} from '@/config/abis';
 import {explorerTxUrl} from '@/config/chain';
 import {ARKSWAP_ROUTER_ADDRESS} from '@/config/contracts';
-import {routedAddress, sameToken} from '@/config/tokens';
+import {sameToken} from '@/config/tokens';
 import {useAllowance} from '@/hooks/useAllowance';
-import {usePoolState} from '@/hooks/usePoolState';
+import {useSwapRoute} from '@/hooks/useSwapRoute';
 import {useTokenBalance} from '@/hooks/useTokenBalance';
-import {
-  LP_FEE_BPS,
-  deadlineFromNow,
-  getAmountOut,
-  impactSeverity,
-  minimumReceived,
-  priceImpactBps,
-} from '@/lib/amm';
+import {LP_FEE_BPS, deadlineFromNow, impactSeverity, minimumReceived} from '@/lib/amm';
 import {formatAmount, formatBps, parseAmount} from '@/lib/format';
-import {orientReserves} from '@/lib/pools';
 import {useSwapTokens} from '@/state/swap';
 
 import {AmountField} from './AmountField';
@@ -33,29 +25,23 @@ export function SwapCard() {
   const [slippageBps, setSlippageBps] = useState(50n);
   const [deadlineMinutes, setDeadlineMinutes] = useState(20);
 
-  const {pool, derivationMismatch, isLoading, refetch} = usePoolState(tokenIn, tokenOut);
   const balanceIn = useTokenBalance(tokenIn);
   const balanceOut = useTokenBalance(tokenOut);
 
   const amountIn = useMemo(() => parseAmount(input, tokenIn.decimals), [input, tokenIn.decimals]);
 
+  // Routing lives in the hook: it tries the direct pair and one hop through each
+  // configured hub, then keeps whichever actually returns the most output.
+  const {route, noLiquidity, isLoading, refetch} = useSwapRoute(tokenIn, tokenOut, amountIn);
+
   const quote = useMemo(() => {
-    if (!pool || amountIn === null || amountIn <= 0n) return undefined;
-    const routed = routedAddress(tokenIn);
-    if (!routed) return undefined;
-    const {reserveIn, reserveOut} = orientReserves(pool, routed);
-    if (reserveIn <= 0n || reserveOut <= 0n) return undefined;
-    try {
-      const amountOut = getAmountOut(amountIn, reserveIn, reserveOut);
-      return {
-        amountOut,
-        minReceived: minimumReceived(amountOut, slippageBps),
-        impactBps: priceImpactBps(amountIn, reserveIn, reserveOut),
-      };
-    } catch {
-      return undefined;
-    }
-  }, [pool, amountIn, tokenIn, slippageBps]);
+    if (!route) return undefined;
+    return {
+      amountOut: route.amountOut,
+      minReceived: minimumReceived(route.amountOut, slippageBps),
+      impactBps: route.impactBps,
+    };
+  }, [route, slippageBps]);
 
   const {needsApproval, approve, isApproving, approvalConfirmed, refetchAllowance} = useAllowance(
     tokenIn,
@@ -90,12 +76,11 @@ export function SwapCard() {
   }
 
   function submit() {
-    if (!ARKSWAP_ROUTER_ADDRESS || !address || !quote || amountIn === null) return;
-    const inAddr = routedAddress(tokenIn);
-    const outAddr = routedAddress(tokenOut);
-    if (!inAddr || !outAddr) return;
+    if (!ARKSWAP_ROUTER_ADDRESS || !address || !quote || amountIn === null || !route) return;
 
-    const path = [inAddr, outAddr] as const;
+    // The full discovered path — two addresses for a direct pair, three when
+    // hopping through a hub. The Router handles both identically.
+    const path = route.path;
     const deadline = deadlineFromNow(deadlineMinutes);
     // Execution is always bounded on-chain by amountOutMin; the local quote is
     // only a display estimate (llm.txt s42).
@@ -129,11 +114,10 @@ export function SwapCard() {
   const label = (() => {
     if (!isConnected) return 'Get started';
     if (sameToken(tokenIn, tokenOut)) return 'Select different tokens';
-    if (derivationMismatch) return 'Pool address mismatch';
     if (!input || amountIn === null || amountIn <= 0n) return 'Enter an amount';
     if (insufficientBalance) return `Insufficient ${tokenIn.symbol}`;
-    if (isLoading) return 'Loading pool…';
-    if (!pool) return 'No liquidity for this pair';
+    if (isLoading) return 'Finding best route…';
+    if (noLiquidity) return 'No liquidity for this pair';
     if (!quote) return 'Insufficient liquidity';
     if (severity === 'severe') return 'Price impact too high';
     if (needsApproval) return isApproving ? 'Approving…' : `Approve ${tokenIn.symbol}`;
@@ -144,7 +128,6 @@ export function SwapCard() {
   const blocked =
     !isConnected ||
     sameToken(tokenIn, tokenOut) ||
-    derivationMismatch ||
     !quote ||
     insufficientBalance ||
     severity === 'severe' ||
@@ -231,16 +214,12 @@ export function SwapCard() {
           <div className="details__row">
             <span>Route</span>
             <strong>
-              {tokenIn.symbol} → {tokenOut.symbol}
+              {route ? route.symbols.join(' → ') : `${tokenIn.symbol} → ${tokenOut.symbol}`}
+              {route && route.path.length > 2 && (
+                <span className="muted" style={{fontWeight: 400}}> (via {route.symbols[1]})</span>
+              )}
             </strong>
           </div>
-        </div>
-      )}
-
-      {derivationMismatch && (
-        <div className="alert alert--danger">
-          The pair address derived locally does not match the factory. This build&apos;s{' '}
-          <code>PAIR_INIT_CODE_HASH</code> is wrong for this deployment; swapping is disabled.
         </div>
       )}
 

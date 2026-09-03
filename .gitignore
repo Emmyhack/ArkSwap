@@ -19,4 +19,11 @@ tools/solc/*/package-lock.json
 .DS_Store
 
 # Local preview stack (script/LocalPreview.s.sol) — anvil only, not a real deployment
-deployments/local-preview.json
+packages/addresses/local-preview.json
+
+# Turborepo
+.turbo/
+
+# Go build output
+apps/api/bin/
+apps/indexer/bin/

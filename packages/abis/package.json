@@ -1,0 +1,12 @@
+{
+  "name": "@arkswap/abis",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ArkSwap contract ABIs, generated from the Foundry artifacts",
+  "main": "index.ts",
+  "types": "index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./*.json": "./*.json"
+  }
+}

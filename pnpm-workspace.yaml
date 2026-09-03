@@ -1,0 +1,7 @@
+packages:
+  - 'apps/web'
+  - 'packages/abis'
+  - 'packages/addresses'
+  - 'packages/config'
+  - 'packages/types'
+  - 'packages/sdk'

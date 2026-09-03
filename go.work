@@ -1,0 +1,10 @@
+// Root Go workspace. The two Go applications share internal packages but build
+// and run independently (llm.txt s3). Foundry and pnpm dependencies are kept out
+// of Go tooling and vice versa.
+go 1.23
+
+use (
+	./apps/api
+	./apps/indexer
+	./packages/gointernal
+)

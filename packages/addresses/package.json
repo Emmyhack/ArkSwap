@@ -1,0 +1,12 @@
+{
+  "name": "@arkswap/addresses",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Canonical ArkSwap deployment manifests per network",
+  "main": "index.ts",
+  "types": "index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./ark-devnet.json": "./ark-devnet.json"
+  }
+}

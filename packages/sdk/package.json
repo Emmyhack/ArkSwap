@@ -1,0 +1,18 @@
+{
+  "name": "@arkswap/sdk",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ArkSwap client helpers: AMM math and the analytics API client",
+  "main": "index.ts",
+  "types": "index.ts",
+  "exports": {".": "./index.ts"},
+  "dependencies": {
+    "@arkswap/abis": "workspace:*",
+    "@arkswap/addresses": "workspace:*",
+    "@arkswap/config": "workspace:*",
+    "@arkswap/types": "workspace:*"
+  },
+  "peerDependencies": {
+    "viem": "^2.21.0"
+  }
+}

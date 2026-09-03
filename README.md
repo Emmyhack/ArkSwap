@@ -17,36 +17,66 @@ Every deviation from upstream is enumerated in [`docs/UPSTREAM-DIFF.md`](docs/UP
 ## Layout
 
 ```
-contracts/core/        ArkSwapFactory, ArkSwapPair, ArkSwapERC20   (solc 0.5.16)
-contracts/periphery/   ArkSwapRouter01/02, ArkSwapLibrary          (solc 0.6.6)
-contracts/test/        mocks and fixtures — never deployed         (solc 0.8.24)
-test/                  unit, fuzz and invariant suites             (solc 0.8.24)
-script/                deployment + smoke-test scripts
-frontend/              Next.js + wagmi/viem swap and pool UI
-tools/                 solc shims, init-code-hash generator, slither runner
-deployments/           deployment manifest (template until deployed)
-docs/                  upstream diff, static-analysis review
+apps/
+  web/                  Next.js frontend (@arkswap/web)
+  api/                  Go REST API            — see "Backend status"
+  indexer/              Go blockchain indexer  — see "Backend status"
+packages/
+  contracts/            Foundry project (core solc 0.5.16, periphery 0.6.6)
+  abis/                 GENERATED ABIs + pair init-code hash
+  addresses/            Canonical deployment manifests
+  config/               Shared chain and token configuration
+  types/                Shared analytics API types
+  sdk/                  AMM math + analytics API client
+infra/
+  postgres/migrations/  SQL migrations
+  docker/               Dockerfiles
+scripts/                generate-abis, deploy, verify, seed-liquidity
+docs/                   upstream diff, security review, readiness
 ```
 
-Core and periphery keep their **original upstream compiler versions**. Modernising
-to 0.8.x while also changing behaviour is exactly what llm.txt s4 warns against,
-and it would invalidate the applicability of upstream audit history. The 0.8.x
-test suite reaches across the version boundary by deploying the real compiled
-artifacts with `vm.deployCode`, so tests exercise the exact bytecode destined for Ark.
+pnpm workspaces + Turborepo orchestrate the TypeScript side. Foundry stays the
+contract toolchain and Go modules stay independent — neither is forced into pnpm.
 
-## Quick start
+**One source of truth per fact.** ABIs are generated from the compiled artifacts
+into `packages/abis`; addresses live only in `packages/addresses`; the pair
+init-code hash is generated, never hand-copied. `apps/web` consumes all three
+rather than keeping its own copies.
+
+```
+packages/contracts ──> packages/abis ──┐
+                  └──> packages/addresses ──┼──> apps/web, apps/api, apps/indexer
+                                            └──> PostgreSQL (indexer)
+```
+
+### Commands
 
 ```bash
-make install     # forge-std + pinned solc 0.5.16 / 0.6.6
-make build
-make test
+pnpm install
+pnpm web:dev            # frontend on :3000
+pnpm contracts:build
+pnpm contracts:test
+pnpm contracts:gate     # MANDATORY init-code-hash + pairFor gate
+pnpm abis:generate      # regenerate packages/abis from Foundry artifacts
+pnpm build              # turbo: all TS packages
+pnpm typecheck
 ```
 
-On Apple Silicon, `make install` is required: solc 0.5.16 and 0.6.6 ship x86-only
-macOS binaries. `tools/install-solc.sh` installs the official emscripten builds of
-the **same compiler commits** behind the solc CLI Foundry drives, which produce
-identical bytecode. Any existing native binary is preserved as
-`solc-<version>.native.bak`. Details in `docs/UPSTREAM-DIFF.md` §9.
+Contract work still runs through the Makefile in `packages/contracts`
+(`make gate`, `make deploy-router`, `make verify-all`, `make verify-pairs-local`).
+
+### Compilers
+
+Core and periphery keep their **original upstream compiler versions**. Modernising
+to 0.8.x while also changing behaviour is exactly what llm.txt s4 warns against.
+The 0.8.x test suite reaches across the version boundary by deploying the real
+compiled artifacts with `vm.deployCode`.
+
+On Apple Silicon, `packages/contracts/tools/install-solc.sh` is required: solc
+0.5.16 and 0.6.6 ship x86-only macOS binaries. It installs the official emscripten
+builds of the **same compiler commits** behind the solc CLI Foundry drives. The
+generated `~/.svm` wrappers embed an absolute path, so **re-run it after moving
+the repository**.
 
 ## Tests
 

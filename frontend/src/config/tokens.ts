@@ -29,7 +29,7 @@ const DEVNET_WARNING = 'DEVNET TEST TOKEN — NO REAL VALUE';
  */
 export const KASH: Token = {
   symbol: NATIVE_CURRENCY.symbol,
-  name: 'Ark Constellation native asset',
+  name: 'Ark Constellation',
   decimals: NATIVE_CURRENCY.decimals,
   isNative: true,
 };

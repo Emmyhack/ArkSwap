@@ -1,0 +1,22 @@
+# Foundry
+out/
+cache/
+broadcast/
+
+# Secrets -- NEVER commit a real key or a populated .env (llm.txt s24, s57)
+.env
+.env.*
+!.env.example
+
+# Node / frontend
+node_modules/
+dist/
+.next/
+tools/solc/*/node_modules/
+tools/solc/*/package-lock.json
+
+# OS
+.DS_Store
+
+# Local preview stack (script/LocalPreview.s.sol) — anvil only, not a real deployment
+deployments/local-preview.json

@@ -1,0 +1,60 @@
+{
+  "_status": "TEMPLATE -- NOT YET DEPLOYED",
+  "_blockedOn": [
+    "No Ark Constellation devnet network values are available yet (RPC, EVM chain id,",
+    "Blockscout endpoints). llm.txt s3 and s57 forbid inventing them.",
+    "",
+    "No canonical WKASH deployment exists yet: ../kashwrappedtoken/deployments/ark-devnet.json",
+    "is itself still a template with canonical.approvedByArkCoreTeam = false.",
+    "llm.txt s14 and s57 forbid deploying ArkSwap against a substitute wrapper.",
+    "",
+    "Fill every <...> below only from a real deployment. Set _status to 'DEPLOYED'",
+    "and delete the underscore keys once script/SmokeTest.s.sol passes and",
+    "Blockscout shows matching verified source for every contract."
+  ],
+
+  "network": "Ark Constellation Devnet",
+  "evmChainId": "<ARK_EVM_CHAIN_ID>",
+  "nativeSymbol": "KASH",
+  "wkash": "<WKASH_ADDRESS>",
+  "factory": "<ARKSWAP_FACTORY_ADDRESS>",
+  "router02": "<ARKSWAP_ROUTER_ADDRESS>",
+  "feeToSetter": "<FEE_TO_SETTER>",
+  "feeTo": "0x0000000000000000000000000000000000000000",
+  "pairInitCodeHash": "0x30820c342fc28c16c80e536d138c0c5290a90de3583c2a126a9e19b519432e74",
+
+  "tokens": {
+    "mUSDC": "<MOCK_USDC_ADDRESS>",
+    "mUSDT": "<MOCK_USDT_ADDRESS>"
+  },
+  "pairs": {
+    "WKASH_mUSDC": "<PAIR_ADDRESS>"
+  },
+  "deployments": {
+    "factoryTx": "<TX_HASH>",
+    "factoryBlock": "<BLOCK_NUMBER>",
+    "routerTx": "<TX_HASH>",
+    "routerBlock": "<BLOCK_NUMBER>"
+  },
+
+  "compiler": {
+    "core": "0.5.16+commit.9c3226ce",
+    "periphery": "0.6.6+commit.6c089d02",
+    "optimizer": true,
+    "optimizerRuns": 999999,
+    "evmVersion": "istanbul",
+    "bytecodeHash": "ipfs",
+    "viaIR": false,
+    "note": "These settings determine ArkSwapPair creation code and therefore pairInitCodeHash. Changing any of them requires `make init-code-hash` and a fresh review."
+  },
+
+  "provenance": {
+    "upstreamCore": "https://github.com/Uniswap/v2-core",
+    "upstreamPeriphery": "https://github.com/Uniswap/v2-periphery",
+    "semanticChanges": "see docs/UPSTREAM-DIFF.md",
+    "protocolFeeEnabled": false
+  },
+
+  "sourceCommit": "<GIT_COMMIT>",
+  "verified": false
+}

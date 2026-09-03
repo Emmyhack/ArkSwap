@@ -1,0 +1,6 @@
+{
+  "name": "arkswap-solc-0.6.6",
+  "private": true,
+  "description": "Pinned emscripten solc 0.6.6 used by tools/solc-shim.js",
+  "dependencies": {"solc": "0.6.6"}
+}

@@ -1,10 +1,14 @@
-// Root Go workspace. The two Go applications share internal packages but build
-// and run independently (llm.txt s3). Foundry and pnpm dependencies are kept out
-// of Go tooling and vice versa.
-go 1.23
+// Root Go workspace.
+//
+// The shared backend packages live in packages/gointernal. Go's `internal/`
+// visibility is module-scoped, so shared code lives in its own module rather
+// than an internal/ directory that neither application could import.
+//
+// apps/api and apps/indexer join this list once they have code; the sync loop
+// and HTTP layer are the next milestone.
+//
+// Foundry and pnpm dependencies are deliberately kept out of Go tooling, and Go
+// out of pnpm (monorepo rules).
+go 1.27.1
 
-use (
-	./apps/api
-	./apps/indexer
-	./packages/gointernal
-)
+use ./packages/gointernal

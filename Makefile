@@ -44,7 +44,22 @@ gate: build ## MANDATORY pre-deployment gate (llm.txt s7, s20, s29)
 ## Deployment. Every target below requires a populated .env and refuses to run
 ## against a chain whose id does not match ARK_EVM_CHAIN_ID (llm.txt s3, s26).
 ## ---------------------------------------------------------------------------
-FORGE_SCRIPT = forge script --rpc-url "$$ARK_RPC_URL" --broadcast -vvv
+# --gas-estimate-multiplier 300
+#   Ark's estimates for these scripts come from the in-simulation state, where
+#   storage slots touched by an earlier transaction in the same run are already
+#   warm. On-chain those same slots are cold (EIP-2929: 2100 vs 100 for SLOAD,
+#   2600 vs 100 for account access), so a swap can need ~25k more gas than was
+#   estimated. When that happens the pair's SSTORE in _update() is left with
+#   <= 2300 gas and trips the EIP-2200 reentrancy sentry, which surfaces as
+#   `ReentrancySentryOOG` rather than a plain out-of-gas. Observed on the
+#   mUSDC -> KASH leg of the smoke test: estimated 115,976, actually needed
+#   ~140,092. The multiplier gives ample headroom; unused gas is refunded.
+#
+# --slow
+#   Send transactions one at a time, waiting for each receipt, so a later
+#   transaction never estimates against state an earlier one has not committed.
+FORGE_SCRIPT = forge script --rpc-url "$$ARK_RPC_URL" --broadcast --slow \
+                 --gas-estimate-multiplier 300 -vvv
 
 deploy-mocks: ## Step 4: deploy devnet mock stablecoins
 	source .env && $(FORGE_SCRIPT) script/DeployMocks.s.sol:DeployMocks
@@ -71,15 +86,38 @@ verify-factory: ## Verify ArkSwapFactory on Blockscout
 	source .env && forge verify-contract "$$ARKSWAP_FACTORY_ADDRESS" \
 	  contracts/core/ArkSwapFactory.sol:ArkSwapFactory \
 	  --verifier blockscout --verifier-url "$$ARK_BLOCKSCOUT_API_URL" \
-	  --compiler-version 0.5.16 \
-	  --constructor-args $$(cast abi-encode "constructor(address)" "$$FEE_TO_SETTER")
+	  --compiler-version v0.5.16+commit.9c3226ce --num-of-optimizations 999999 \
+	  --constructor-args $$(cast abi-encode "constructor(address)" "$$FEE_TO_SETTER") --watch
 
 verify-router: ## Verify ArkSwapRouter02 on Blockscout
 	source .env && forge verify-contract "$$ARKSWAP_ROUTER_ADDRESS" \
 	  contracts/periphery/ArkSwapRouter02.sol:ArkSwapRouter02 \
 	  --verifier blockscout --verifier-url "$$ARK_BLOCKSCOUT_API_URL" \
-	  --compiler-version 0.6.6 \
-	  --constructor-args $$(cast abi-encode "constructor(address,address)" "$$ARKSWAP_FACTORY_ADDRESS" "$$WKASH_ADDRESS")
+	  --compiler-version v0.6.6+commit.6c089d02 --num-of-optimizations 999999 \
+	  --constructor-args $$(cast abi-encode "constructor(address,address)" "$$ARKSWAP_FACTORY_ADDRESS" "$$WKASH_ADDRESS") --watch
+
+verify-mocks: ## Verify the devnet mock stablecoins on Blockscout
+	source .env && forge verify-contract "$$MOCK_USDC_ADDRESS" contracts/test/MockUSDC.sol:MockUSDC \
+	  --verifier blockscout --verifier-url "$$ARK_BLOCKSCOUT_API_URL" \
+	  --compiler-version v0.8.24+commit.e11b9ed9 --num-of-optimizations 999999 \
+	  --constructor-args $$(cast abi-encode "constructor(uint256)" 0) --watch
+	source .env && forge verify-contract "$$MOCK_USDT_ADDRESS" contracts/test/MockUSDT.sol:MockUSDT \
+	  --verifier blockscout --verifier-url "$$ARK_BLOCKSCOUT_API_URL" \
+	  --compiler-version v0.8.24+commit.e11b9ed9 --num-of-optimizations 999999 \
+	  --constructor-args $$(cast abi-encode "constructor(uint256)" 0) --watch
+
+## Pairs are CREATE2-deployed by the factory and take no constructor arguments.
+## This fails with "The address is not a smart contract" until the explorer has
+## indexed contract creations from internal transactions. Retry once it has.
+verify-pairs: ## Verify deployed ArkSwapPair contracts on Blockscout
+	source .env && for p in $$(python3 -c "import json;print(' '.join(json.load(open('deployments/ark-devnet.json'))['pairs'].values()))"); do \
+	  echo "--- $$p ---"; \
+	  forge verify-contract "$$p" contracts/core/ArkSwapPair.sol:ArkSwapPair \
+	    --verifier blockscout --verifier-url "$$ARK_BLOCKSCOUT_API_URL" \
+	    --compiler-version v0.5.16+commit.9c3226ce --num-of-optimizations 999999 --watch || true; \
+	done
+
+verify-all: verify-factory verify-router verify-mocks verify-pairs ## Verify every deployed contract
 
 clean:
 	forge clean

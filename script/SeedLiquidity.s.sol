@@ -20,6 +20,17 @@ interface IRouterSeed {
         address to,
         uint256 deadline
     ) external payable returns (uint256 amountToken, uint256 amountETH, uint256 liquidity);
+
+    function addLiquidity(
+        address tokenA,
+        address tokenB,
+        uint256 amountADesired,
+        uint256 amountBDesired,
+        uint256 amountAMin,
+        uint256 amountBMin,
+        address to,
+        uint256 deadline
+    ) external returns (uint256 amountA, uint256 amountB, uint256 liquidity);
 }
 
 interface IPairRead {
@@ -50,6 +61,48 @@ contract SeedLiquidity is ArkScript {
     function run() external {
         Config memory c = _loadConfig();
         _seed(c);
+        _seedSecondaryPools(c);
+    }
+
+    /// @dev Optional WKASH/mUSDT and mUSDC/mUSDT pools. The mUSDC/mUSDT pool is
+    ///      what makes a multi-hop route testable (llm.txt s16, s34). Skipped
+    ///      entirely when MOCK_USDT_ADDRESS is unset.
+    function _seedSecondaryPools(Config memory c) internal {
+        address musdt = vm.envOr("MOCK_USDT_ADDRESS", address(0));
+        if (musdt == address(0)) {
+            console2.log("MOCK_USDT_ADDRESS unset -- skipping secondary pools");
+            return;
+        }
+
+        uint256 kashAmount = vm.envOr("SEED_KASH_AMOUNT_USDT", uint256(15 ether));
+        uint256 usdtAmount = vm.envOr("SEED_MUSDT_AMOUNT", uint256(15e6));
+        uint256 stableAmount = vm.envOr("SEED_STABLE_AMOUNT", uint256(50_000e6));
+
+        require(
+            c.deployer.balance >= kashAmount, "SeedLiquidity: insufficient native KASH for the secondary WKASH pool"
+        );
+
+        _startBroadcast();
+
+        // WKASH / mUSDT
+        ITokenOps(musdt).mint(c.deployer, usdtAmount);
+        ITokenOps(musdt).approve(c.router, usdtAmount);
+        (, uint256 kashUsed,) = IRouterSeed(c.router).addLiquidityETH{value: kashAmount}(
+            musdt, usdtAmount, 0, 0, c.deployer, block.timestamp + 20 minutes
+        );
+
+        // mUSDC / mUSDT -- costs no native KASH, both sides are mintable mocks.
+        ITokenOps(c.musdc).mint(c.deployer, stableAmount);
+        ITokenOps(musdt).mint(c.deployer, stableAmount);
+        ITokenOps(c.musdc).approve(c.router, stableAmount);
+        ITokenOps(musdt).approve(c.router, stableAmount);
+        IRouterSeed(c.router)
+            .addLiquidity(c.musdc, musdt, stableAmount, stableAmount, 0, 0, c.deployer, block.timestamp + 20 minutes);
+
+        vm.stopBroadcast();
+
+        console2.log("WKASH/mUSDT seeded, KASH used", kashUsed);
+        console2.log("mUSDC/mUSDT seeded, each side", stableAmount);
     }
 
     function _loadConfig() internal view returns (Config memory c) {

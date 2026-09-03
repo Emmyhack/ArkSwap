@@ -1,45 +1,55 @@
 {
-  "_status": "TEMPLATE -- NOT YET DEPLOYED",
-  "_blockedOn": [
-    "No Ark Constellation devnet network values are available yet (RPC, EVM chain id,",
-    "Blockscout endpoints). llm.txt s3 and s57 forbid inventing them.",
+  "_status": "DEPLOYED — devnet only, NOT production-ready",
+  "_readiness": [
+    "This is an Ark Constellation DEVNET deployment. It has not been audited and",
+    "must not be treated as production. See docs/PRODUCTION-READINESS.md for the",
+    "gates that remain open (llm.txt s53, s57).",
     "",
-    "No canonical WKASH deployment exists yet: ../kashwrappedtoken/deployments/ark-devnet.json",
-    "is itself still a template with canonical.approvedByArkCoreTeam = false.",
-    "llm.txt s14 and s57 forbid deploying ArkSwap against a substitute wrapper.",
-    "",
-    "Fill every <...> below only from a real deployment. Set _status to 'DEPLOYED'",
-    "and delete the underscore keys once script/SmokeTest.s.sol passes and",
-    "Blockscout shows matching verified source for every contract."
+    "feeToSetter is a single deployer EOA, which is acceptable for devnet only",
+    "(llm.txt s25). Any long-lived deployment must use an Ark team multisig."
   ],
 
   "network": "Ark Constellation Devnet",
-  "evmChainId": "<ARK_EVM_CHAIN_ID>",
+  "evmChainId": "9000",
+  "cometbftChainId": "arkdevnet_9000-1",
   "nativeSymbol": "KASH",
-  "wkash": "<WKASH_ADDRESS>",
-  "factory": "<ARKSWAP_FACTORY_ADDRESS>",
-  "router02": "<ARKSWAP_ROUTER_ADDRESS>",
-  "feeToSetter": "<FEE_TO_SETTER>",
+  "rpc": "https://evm.34.60.137.196.sslip.io",
+  "explorer": "https://explorer.34.60.137.196.sslip.io",
+
+  "wkash": "0x6792d2fD02d8A55c543F627d0e90526f9278C6d6",
+  "factory": "0x594f74aDCa63Af06d10Ee06fEe8F237DBb560e06",
+  "router02": "0xF2a7fD4072d70D2e7eDF5a5eB653965CEe0871b6",
+  "feeToSetter": "0x4FEA262782b5BE34B18cf24b6aC026215899EEc0",
   "feeTo": "0x0000000000000000000000000000000000000000",
   "pairInitCodeHash": "0x30820c342fc28c16c80e536d138c0c5290a90de3583c2a126a9e19b519432e74",
 
   "tokens": {
-    "mUSDC": "<MOCK_USDC_ADDRESS>",
-    "mUSDT": "<MOCK_USDT_ADDRESS>"
+    "mUSDC": "0xC8d15f9A42Ee3107ab1257E38199e3Bf899dCfB3",
+    "mUSDT": "0x073D643F712C136D2e7F71d683d9E26b6EFC845b"
   },
   "pairs": {
-    "WKASH_mUSDC": "<PAIR_ADDRESS>"
+    "WKASH_mUSDC": "0x022850A98a241FF9E3978Cd1B596295cF1451719",
+    "WKASH_mUSDT": "0x5575dB26621DEe45d6067D647c58648F98DCf160",
+    "mUSDC_mUSDT": "0x6120C976169e4fEcfD7b5ab1C024f4015a60daB4"
   },
+
   "deployments": {
-    "factoryTx": "<TX_HASH>",
-    "factoryBlock": "<BLOCK_NUMBER>",
-    "routerTx": "<TX_HASH>",
-    "routerBlock": "<BLOCK_NUMBER>"
+    "deployer": "0x4FEA262782b5BE34B18cf24b6aC026215899EEc0",
+    "factoryTx": "0xe10defcb52f28ae13fab861ccd6ff9f353099700480c0ed2e12dcd19e7ad3536",
+    "factoryBlock": 177472,
+    "router02Tx": "0xa304831c7c3f875f1a8ce44efcac7536835c2ee3900ee7a5222ae048e8cfd54e",
+    "router02Block": 177491,
+    "mUSDCTx": "0x2e8f0c114677aa85f0b4f5598cf52279b11831639d44d5e821e7482663e95119",
+    "mUSDCBlock": 177457,
+    "mUSDTTx": "0x7be856488f952f9add24aec3ccd7526fb67cc214d9d8644282a7339abbb367ea",
+    "mUSDTBlock": 177458,
+    "pairCreationBlocks": [177509, 177511, 177513]
   },
 
   "compiler": {
     "core": "0.5.16+commit.9c3226ce",
     "periphery": "0.6.6+commit.6c089d02",
+    "mocks": "0.8.24+commit.e11b9ed9",
     "optimizer": true,
     "optimizerRuns": 999999,
     "evmVersion": "istanbul",
@@ -48,13 +58,32 @@
     "note": "These settings determine ArkSwapPair creation code and therefore pairInitCodeHash. Changing any of them requires `make init-code-hash` and a fresh review."
   },
 
+  "verified": {
+    "factory": true,
+    "router02": true,
+    "mUSDC": true,
+    "mUSDT": true,
+    "wkash": true,
+    "pairs": false,
+    "pairsNote": "The three pair contracts are live and functioning, but this Blockscout instance does not index CREATE2 contract creations from internal transactions, so it does not yet recognise the pair addresses as contracts ('Could not detect deployment: The address is not a smart contract'). Pair source is identical for all pairs and verifies once the explorer indexes them. Re-run: make verify-pairs"
+  },
+
+  "liveChecks": {
+    "chainIdMatches": true,
+    "wkashSymbol": "WKASH",
+    "wkashDecimals": 18,
+    "pairForMatchesFactory": "all 3 pairs verified against ArkSwapLibrary CREATE2 derivation",
+    "swapKashToMusdc": "0xd2a02a88f7b708909e… succeeded",
+    "swapMusdcToKash": "0x8eefe1c86f304642a4aedaa455a2724a1408e31d76ba656f06773e46d3aa157a",
+    "multiHopMusdtToMusdc": "0x1e0f4ac14aacf76573beac7e7e065ab5d0cd96469b5264b23898038e979f5ddd",
+    "removeLiquidityETH": "0xfb8023b61e43f711c9f699a5ac96a6dc75e079139fd3fe97773f8a2525b644ef"
+  },
+
+  "sourceCommit": "252db0e74d6264e947a26b5f16968a1e58c3f1c0",
   "provenance": {
     "upstreamCore": "https://github.com/Uniswap/v2-core",
     "upstreamPeriphery": "https://github.com/Uniswap/v2-periphery",
     "semanticChanges": "see docs/UPSTREAM-DIFF.md",
     "protocolFeeEnabled": false
-  },
-
-  "sourceCommit": "<GIT_COMMIT>",
-  "verified": false
+  }
 }

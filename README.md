@@ -8,9 +8,9 @@ ArkSwap V1 is a **minimal semantic fork** of Uniswap V2: constant-product
 a Router02-shaped periphery. The economic model and core math are unmodified.
 Every deviation from upstream is enumerated in [`docs/UPSTREAM-DIFF.md`](docs/UPSTREAM-DIFF.md).
 
-> **Status: not deployed.** The contracts build and the full suite passes, but
-> deployment is blocked on Ark Constellation network values and a canonical WKASH
-> address. See [Deployment status](#deployment-status).
+> **Status: deployed to Ark Constellation devnet. Not production-ready.**
+> A formal audit, a multisig `feeToSetter` and Ark core-team coordination remain
+> outstanding — see [`docs/PRODUCTION-READINESS.md`](docs/PRODUCTION-READINESS.md).
 
 ---
 
@@ -99,20 +99,36 @@ the ABI is inherited terminology and nothing more. The router also exposes
 The UI must always say KASH, never ETH. Native KASH and WKASH remain distinct
 assets in the token selector: choosing one never silently gives the other.
 
-## Deployment status
+## Deployed — Ark Constellation devnet (chain id 9000)
 
-**Blocked. Nothing has been deployed.**
+| Contract | Address | Verified |
+| --- | --- | --- |
+| ArkSwapFactory | `0x594f74aDCa63Af06d10Ee06fEe8F237DBb560e06` | yes |
+| ArkSwapRouter02 | `0xF2a7fD4072d70D2e7eDF5a5eB653965CEe0871b6` | yes |
+| WKASH (canonical) | `0x6792d2fD02d8A55c543F627d0e90526f9278C6d6` | yes |
+| mUSDC (devnet mock) | `0xC8d15f9A42Ee3107ab1257E38199e3Bf899dCfB3` | yes |
+| mUSDT (devnet mock) | `0x073D643F712C136D2e7F71d683d9E26b6EFC845b` | yes |
+| WKASH/mUSDC pair | `0x022850A98a241FF9E3978Cd1B596295cF1451719` | pending¹ |
+| WKASH/mUSDT pair | `0x5575dB26621DEe45d6067D647c58648F98DCf160` | pending¹ |
+| mUSDC/mUSDT pair | `0x6120C976169e4fEcfD7b5ab1C024f4015a60daB4` | pending¹ |
 
-Two prerequisites are missing, and llm.txt s3/s14/s57 forbid inventing either:
+`feeTo` is `address(0)` — the protocol fee is disabled and the full 0.30% stays
+with liquidity providers. Full metadata, transaction hashes and blocks are in
+[`deployments/ark-devnet.json`](deployments/ark-devnet.json).
 
-1. **Ark Constellation network values** — RPC URL, EVM chain id, and Blockscout endpoints are not available in this repository or its environment.
-2. **A canonical WKASH address** — the sibling `kashwrappedtoken` project's manifest is still a template (`_status: "TEMPLATE — NOT YET DEPLOYED"`, `canonical.approvedByArkCoreTeam: false`). ArkSwap must never deploy or accept a substitute wrapper.
+¹ Pairs are live and functioning, but this Blockscout instance does not index
+CREATE2 creations from internal transactions, so it does not yet recognise the
+addresses as contracts. Retry with `make verify-pairs`.
 
-The scripts are written to fail loudly rather than guess. Each one requires its
-env vars, asserts `block.chainid == ARK_EVM_CHAIN_ID` before broadcasting, and
-verifies WKASH's `symbol()`/`decimals()` on-chain.
+**Live checks performed:** KASH → mUSDC and mUSDC → KASH swaps, a multi-hop
+mUSDT → WKASH → mUSDC route that delivered exactly the quoted amount, and a 25%
+liquidity removal that returned principal plus accrued fees. The off-chain
+`ArkSwapLibrary.pairFor` derivation was checked against the deployed factory for
+all three pairs.
 
-Once both prerequisites exist, fill `.env` from `.env.example` and run in order:
+### Reproducing the deployment
+
+Fill `.env` from `.env.example`, then:
 
 ```bash
 make deploy-mocks      # 4.  devnet mock stablecoins
@@ -122,11 +138,14 @@ make deploy-router     # 8.  ArkSwapRouter02 (re-runs the gate itself)
 make create-pairs      # 11. WKASH/mUSDC and friends
 make seed              # 13. seed liquidity
 make smoke             # 14. live swaps, both directions
-make verify-factory verify-router   # 16. Blockscout
+make verify-all        # 16. Blockscout
 ```
 
-Then record everything in `deployments/ark-devnet.json` and configure the
-frontend from it.
+Deployment targets run with `--slow --gas-estimate-multiplier 300`. Ark's
+in-simulation gas estimates assume warm storage and under-estimate swaps by
+roughly 25k gas; without the headroom a swap can leave the pair's `SSTORE` with
+≤ 2300 gas and trip the EIP-2200 sentry as `ReentrancySentryOOG`. See
+`docs/PRODUCTION-READINESS.md`.
 
 ## Frontend
 

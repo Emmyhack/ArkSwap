@@ -108,17 +108,35 @@ assets in the token selector: choosing one never silently gives the other.
 | WKASH (canonical) | `0x6792d2fD02d8A55c543F627d0e90526f9278C6d6` | yes |
 | mUSDC (devnet mock) | `0xC8d15f9A42Ee3107ab1257E38199e3Bf899dCfB3` | yes |
 | mUSDT (devnet mock) | `0x073D643F712C136D2e7F71d683d9E26b6EFC845b` | yes |
-| WKASH/mUSDC pair | `0x022850A98a241FF9E3978Cd1B596295cF1451719` | pending¹ |
-| WKASH/mUSDT pair | `0x5575dB26621DEe45d6067D647c58648F98DCf160` | pending¹ |
-| mUSDC/mUSDT pair | `0x6120C976169e4fEcfD7b5ab1C024f4015a60daB4` | pending¹ |
+| WKASH/mUSDC pair | `0x022850A98a241FF9E3978Cd1B596295cF1451719` | bytecode-attested¹ |
+| WKASH/mUSDT pair | `0x5575dB26621DEe45d6067D647c58648F98DCf160` | bytecode-attested¹ |
+| mUSDC/mUSDT pair | `0x6120C976169e4fEcfD7b5ab1C024f4015a60daB4` | bytecode-attested¹ |
 
 `feeTo` is `address(0)` — the protocol fee is disabled and the full 0.30% stays
 with liquidity providers. Full metadata, transaction hashes and blocks are in
 [`deployments/ark-devnet.json`](deployments/ark-devnet.json).
 
-¹ Pairs are live and functioning, but this Blockscout instance does not index
-CREATE2 creations from internal transactions, so it does not yet recognise the
-addresses as contracts. Retry with `make verify-pairs`.
+¹ **The pairs cannot be verified on this explorer, and the cause is upstream of
+ArkSwap.** The Ark devnet JSON-RPC node exposes no trace API — `debug_traceTransaction`,
+`trace_transaction`, `debug_traceBlockByNumber` and `trace_block` all return
+*"does not exist/is not available"*. Blockscout's internal-transaction fetcher
+needs one of them to see the factory's CREATE2 call, so it never records a
+creation for these addresses and rejects verification server-side with *"The
+address is not a smart contract"* — before any source is compared.
+
+Instead, the deployment is attested by bytecode. `ArkSwapPair` has no immutables
+and no constructor arguments, so every pair the factory deploys must carry
+byte-identical runtime code. All three do, and it matches this repository's
+compiled artifact exactly:
+
+```
+keccak256(runtime bytecode) = 0x2ecfe3b325ceceff28477c0c7f82692713e4c2e8d08a11d1ffc535c19af1d75f
+solc 0.5.16 · optimizer 999999 runs · evmVersion istanbul
+```
+
+Reproduce it yourself with `make verify-pairs-local`. Once the Ark team enables
+tracing on the node (in Cosmos EVM, add `debug` to `--json-rpc.api` and let
+Blockscout re-index), `make verify-pairs` will publish source in the usual way.
 
 **Live checks performed:** KASH → mUSDC and mUSDC → KASH swaps, a multi-hop
 mUSDT → WKASH → mUSDC route that delivered exactly the quoted amount, and a 25%

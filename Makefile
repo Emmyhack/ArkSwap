@@ -117,6 +117,11 @@ verify-pairs: ## Verify deployed ArkSwapPair contracts on Blockscout
 	    --compiler-version v0.5.16+commit.9c3226ce --num-of-optimizations 999999 --watch || true; \
 	done
 
+## Attest the deployed pairs by bytecode comparison, for as long as the explorer
+## cannot register factory-created contracts (see tools/verify-pairs-onchain.sh).
+verify-pairs-local: ## Prove deployed pairs match the compiled ArkSwapPair bytecode
+	set -a && source .env && set +a && ./tools/verify-pairs-onchain.sh
+
 verify-all: verify-factory verify-router verify-mocks verify-pairs ## Verify every deployed contract
 
 clean:

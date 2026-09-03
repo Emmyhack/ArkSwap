@@ -29,7 +29,7 @@ The full llm.txt s26 deployment order ran against chain id 9000, and s56's
 | mUSDC → KASH swap | succeeded |
 | Multi-hop mUSDT → WKASH → mUSDC | succeeded, delivered exactly the quoted amount |
 | Liquidity removal | succeeded, LP received principal plus accrued fees |
-| Blockscout verification | factory, router, mocks, WKASH verified — **pairs pending, see below** |
+| Blockscout verification | factory, router, mocks, WKASH verified; pairs bytecode-attested — explorer cannot register them, see below |
 | Deployment manifest | `deployments/ark-devnet.json` |
 | Frontend | reads live reserves; UI quote matches the router exactly |
 
@@ -39,16 +39,48 @@ Addresses are in `deployments/ark-devnet.json`.
 
 ## Open items found during this deployment
 
-### 1. Pair contracts are not verified on Blockscout
+### 1. Pair contracts cannot be verified on Blockscout (explorer/node limitation)
 
-The three pairs are live and functioning, but this Blockscout instance does not
-index CREATE2 contract creations from internal transactions. Verification fails
-with `Could not detect deployment: The address is not a smart contract`, even
-though the address holds ~11 KB of code and serves calls.
+The three pairs are live and functioning, but Blockscout refuses to verify them,
+rejecting the submission server-side with `The address is not a smart contract`
+before any source is compared.
 
-This is an explorer indexing gap, not a contract problem. Retry with
-`make verify-pairs` once the instance indexes internal transactions, or ask the
-Ark team to enable trace/internal-transaction indexing.
+**Root cause, confirmed against the node:** the Ark devnet JSON-RPC endpoint
+exposes no trace API. All four of the methods Blockscout can use return
+`does not exist/is not available`:
+
+```
+debug_traceTransaction      trace_transaction
+debug_traceBlockByNumber    trace_block
+```
+
+Blockscout's internal-transaction fetcher needs one of them to observe the
+factory's CREATE2 call. Without it there is no creation record, the address is
+never classified as a contract, and verification is refused. Blockscout *does*
+index the pairs' ordinary transactions and logs — only the creation is missing.
+
+**This is not a contract defect and cannot be fixed from the repository.** It
+needs the Ark team to enable tracing on the node (in Cosmos EVM / evmos, add
+`debug` to `--json-rpc.api`, e.g. `--json-rpc.api eth,net,web3,debug,txpool`, on
+a node retaining the relevant history) and let Blockscout re-index. After that,
+`make verify-pairs` publishes the source normally.
+
+**Interim assurance — bytecode attestation.** `ArkSwapPair` declares no
+immutables and takes no constructor arguments, so every pair the factory deploys
+must carry byte-identical runtime code. All three do, and it matches this
+repository's compiled artifact exactly:
+
+```
+keccak256(runtime bytecode) = 0x2ecfe3b325ceceff28477c0c7f82692713e4c2e8d08a11d1ffc535c19af1d75f
+solc 0.5.16 · optimizer 999999 runs · evmVersion istanbul
+```
+
+Anyone can reproduce this independently with `make verify-pairs-local`
+(`tools/verify-pairs-onchain.sh`), which recompiles from source and compares
+against live chain code. It provides the same assurance explorer verification
+would — that the deployed pairs are the reviewed contract — without trusting the
+explorer. It is not a substitute for published source on the explorer, which
+should still be completed before any public or production deployment.
 
 ### 2. Gas estimation on Ark under-estimates swaps
 

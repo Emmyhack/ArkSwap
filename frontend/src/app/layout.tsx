@@ -1,6 +1,7 @@
 import type {Metadata} from 'next';
 
 import {Nav} from '@/components/Nav';
+import {Orbs} from '@/components/Orbs';
 
 import {Providers} from './providers';
 import './globals.css';
@@ -15,6 +16,7 @@ export default function RootLayout({children}: {children: React.ReactNode}) {
     <html lang="en">
       <body>
         <Providers>
+          <Orbs />
           <Nav />
           {children}
         </Providers>

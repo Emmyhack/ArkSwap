@@ -15,7 +15,7 @@ import {formatAmount, formatBps, parseAmount, shortenAddress} from '@/lib/format
 import {orientReserves, poolShareBps} from '@/lib/pools';
 
 import {AmountField} from './AmountField';
-import {SlippageControl} from './SlippageControl';
+import {SettingsPopover} from './SettingsPopover';
 
 type Mode = 'add' | 'remove';
 
@@ -208,8 +208,14 @@ export function LiquidityCard() {
   return (
     <div className="card">
       <div className="card__header">
-        <h1 className="card__title">{mode === 'add' ? 'Add liquidity' : 'Remove liquidity'}</h1>
-        <div className="settings" style={{margin: 0}}>
+        <h2 className="card__title">{mode === 'add' ? 'Add liquidity' : 'Remove liquidity'}</h2>
+        <div style={{display: 'flex', gap: 6, alignItems: 'center'}}>
+          <SettingsPopover
+            slippageBps={slippageBps}
+            onSlippageChange={setSlippageBps}
+            deadlineMinutes={deadlineMinutes}
+            onDeadlineChange={setDeadlineMinutes}
+          />
           <button
             type="button"
             className="settings__chip"
@@ -236,7 +242,7 @@ export function LiquidityCard() {
       </div>
 
       {mode === 'add' ? (
-        <div className="stack">
+        <>
           <AmountField
             label="Deposit"
             token={tokenA}
@@ -246,60 +252,48 @@ export function LiquidityCard() {
             onValueChange={setInputA}
             onTokenChange={setTokenA}
           />
+
           <div className="switch">
-            <button type="button" aria-label="and" style={{cursor: 'default'}}>
+            <button type="button" data-static="true" aria-hidden tabIndex={-1}>
               +
             </button>
           </div>
+
           <AmountField
             label={pool ? 'Deposit (at pool ratio)' : 'Deposit (you set the initial price)'}
             token={tokenB}
             exclude={tokenA}
             readOnly={Boolean(pool)}
-            value={
-              pool
-                ? amountB !== undefined
-                  ? formatAmount(amountB, tokenB.decimals)
-                  : ''
-                : inputA
-            }
+            value={pool ? (amountB !== undefined ? formatAmount(amountB, tokenB.decimals) : '') : inputA}
             balance={balanceB.value}
             onValueChange={() => {}}
             onTokenChange={setTokenB}
           />
-        </div>
+        </>
       ) : (
-        <div className="stack">
-          <div className="field">
-            <div className="field__top">
-              <span>Amount to remove</span>
-              <span className="mono">
-                LP balance: {formatAmount(lp, 18)}
-              </span>
-            </div>
-            <div className="field__row">
-              <input
-                className="field__input mono"
-                type="range"
-                min={1}
-                max={100}
-                value={removePercent}
-                onChange={(e) => setRemovePercent(Number(e.target.value))}
-              />
-              <span className="mono" style={{fontSize: 22, fontWeight: 600}}>
-                {removePercent}%
-              </span>
-            </div>
+        <div className="field">
+          <div className="field__label">Amount to remove</div>
+          <div className="field__row">
+            <span className="field__input mono" style={{fontSize: 40}}>
+              {removePercent}%
+            </span>
+          </div>
+          <input
+            className="range"
+            type="range"
+            min={1}
+            max={100}
+            value={removePercent}
+            onChange={(e) => setRemovePercent(Number(e.target.value))}
+            aria-label="Percent of position to remove"
+          />
+          <div className="field__foot">
+            <span>LP balance</span>
+            <span className="mono">{formatAmount(lp, 18)}</span>
           </div>
         </div>
       )}
 
-      <SlippageControl
-        slippageBps={slippageBps}
-        onChange={setSlippageBps}
-        deadlineMinutes={deadlineMinutes}
-        onDeadlineChange={setDeadlineMinutes}
-      />
 
       {pool && (
         <div className="details">
@@ -308,7 +302,7 @@ export function LiquidityCard() {
             <strong>
               {explorerAddressUrl(pool.pair) ? (
                 <a href={explorerAddressUrl(pool.pair)} target="_blank" rel="noreferrer">
-                  {shortenAddress(pool.pair)}
+                  {shortenAddress(pool.pair)} ↗
                 </a>
               ) : (
                 shortenAddress(pool.pair)
@@ -333,25 +327,25 @@ export function LiquidityCard() {
 
       {!pool && (
         <div className="alert alert--info">
-          No pool exists for this pair yet. Your deposit will create it and set the initial price.
+          No pool exists for this pair yet. Your deposit creates it and sets the initial price.
         </div>
       )}
 
       {derivationMismatch && (
         <div className="alert alert--danger">
-          Derived pair address does not match the factory. <code>PAIR_INIT_CODE_HASH</code> is wrong for
-          this deployment.
+          Derived pair address does not match the factory. <code>PAIR_INIT_CODE_HASH</code> is wrong
+          for this deployment.
         </div>
       )}
 
-      {error && <div className="alert alert--danger">{error.message.slice(0, 220)}</div>}
+      {error && <div className="alert alert--danger">{error.message.slice(0, 200)}</div>}
 
       {receipt.isSuccess && hash && (
-        <div className="alert alert--info">
+        <div className="alert alert--accent">
           Confirmed.{' '}
           {explorerTxUrl(hash) ? (
             <a href={explorerTxUrl(hash)} target="_blank" rel="noreferrer">
-              View on Blockscout
+              View on Blockscout ↗
             </a>
           ) : (
             <span className="mono">{hash}</span>
@@ -359,56 +353,50 @@ export function LiquidityCard() {
         </div>
       )}
 
-      <div style={{marginTop: 16}} className="stack">
-        {mode === 'add' ? (
-          <>
-            {allowanceA.needsApproval && (
-              <button className="btn btn--secondary" type="button" onClick={() => allowanceA.approve()}>
-                {allowanceA.isApproving ? 'Approving…' : `Approve ${tokenA.symbol}`}
-              </button>
-            )}
-            {allowanceB.needsApproval && (
-              <button className="btn btn--secondary" type="button" onClick={() => allowanceB.approve()}>
-                {allowanceB.isApproving ? 'Approving…' : `Approve ${tokenB.symbol}`}
-              </button>
-            )}
-            <button
-              className="btn"
-              type="button"
-              disabled={
-                !isConnected ||
-                needsApproval ||
-                sameToken(tokenA, tokenB) ||
-                amountA === null ||
-                amountA <= 0n ||
-                isPending ||
-                receipt.isLoading
-              }
-              onClick={addLiquidity}
-            >
-              {!isConnected
-                ? 'Connect wallet'
-                : isPending || receipt.isLoading
-                  ? 'Adding…'
-                  : 'Add liquidity'}
+      {mode === 'add' ? (
+        <>
+          {allowanceA.needsApproval && (
+            <button className="btn btn--sm" type="button" onClick={() => allowanceA.approve()}>
+              {allowanceA.isApproving ? 'Approving…' : `Approve ${tokenA.symbol}`}
             </button>
-          </>
-        ) : (
-          <>
-            <button className="btn btn--secondary" type="button" disabled={!pool} onClick={approveLp}>
-              Approve LP tokens
+          )}
+          {allowanceB.needsApproval && (
+            <button className="btn btn--sm" type="button" onClick={() => allowanceB.approve()}>
+              {allowanceB.isApproving ? 'Approving…' : `Approve ${tokenB.symbol}`}
             </button>
-            <button
-              className="btn"
-              type="button"
-              disabled={!isConnected || !pool || removeAmount <= 0n || isPending || receipt.isLoading}
-              onClick={removeLiquidity}
-            >
-              {isPending || receipt.isLoading ? 'Removing…' : 'Remove liquidity'}
-            </button>
-          </>
-        )}
-      </div>
+          )}
+          <button
+            className="btn btn--primary"
+            type="button"
+            disabled={
+              !isConnected ||
+              needsApproval ||
+              sameToken(tokenA, tokenB) ||
+              amountA === null ||
+              amountA <= 0n ||
+              isPending ||
+              receipt.isLoading
+            }
+            onClick={addLiquidity}
+          >
+            {!isConnected ? 'Connect wallet' : isPending || receipt.isLoading ? 'Adding…' : 'Add liquidity'}
+          </button>
+        </>
+      ) : (
+        <>
+          <button className="btn btn--sm" type="button" disabled={!pool} onClick={approveLp}>
+            Approve LP tokens
+          </button>
+          <button
+            className="btn btn--primary"
+            type="button"
+            disabled={!isConnected || !pool || removeAmount <= 0n || isPending || receipt.isLoading}
+            onClick={removeLiquidity}
+          >
+            {isPending || receipt.isLoading ? 'Removing…' : 'Remove liquidity'}
+          </button>
+        </>
+      )}
     </div>
   );
 }

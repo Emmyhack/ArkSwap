@@ -15,27 +15,28 @@ export function ConnectButton() {
     const connector = connectors[0];
     return (
       <button
-        className="token-button"
+        className="btn-connect"
         disabled={!connector || isPending}
         onClick={() => connector && connect({connector})}
+        type="button"
       >
-        {isPending ? 'Connecting…' : 'Connect wallet'}
+        {isPending ? 'Connecting…' : 'Connect'}
       </button>
     );
   }
 
-  // Wrong network is a hard stop: a swap sent to another chain would hit an
-  // unrelated contract at the same address.
+  // Wrong network is a hard stop: the same address on another chain is an
+  // unrelated contract, so we never let a swap be sent from one.
   if (chainId !== ARK_CHAIN_ID) {
     return (
-      <button className="token-button" onClick={() => switchChain({chainId: ARK_CHAIN_ID})}>
-        Switch to Ark Constellation
+      <button className="btn-connect btn-connect--warn" onClick={() => switchChain({chainId: ARK_CHAIN_ID})} type="button">
+        Wrong network
       </button>
     );
   }
 
   return (
-    <button className="token-button" onClick={() => disconnect()}>
+    <button className="btn-connect" onClick={() => disconnect()} type="button">
       {address ? shortenAddress(address) : 'Connected'}
     </button>
   );

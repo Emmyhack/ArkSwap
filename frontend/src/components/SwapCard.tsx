@@ -6,7 +6,7 @@ import {useAccount, useWaitForTransactionReceipt, useWriteContract} from 'wagmi'
 import {routerAbi} from '@/config/abis';
 import {explorerTxUrl} from '@/config/chain';
 import {ARKSWAP_ROUTER_ADDRESS} from '@/config/contracts';
-import {KASH, MUSDC, type Token, routedAddress, sameToken} from '@/config/tokens';
+import {routedAddress, sameToken} from '@/config/tokens';
 import {useAllowance} from '@/hooks/useAllowance';
 import {usePoolState} from '@/hooks/usePoolState';
 import {useTokenBalance} from '@/hooks/useTokenBalance';
@@ -20,15 +20,15 @@ import {
 } from '@/lib/amm';
 import {formatAmount, formatBps, parseAmount} from '@/lib/format';
 import {orientReserves} from '@/lib/pools';
+import {useSwapTokens} from '@/state/swap';
 
 import {AmountField} from './AmountField';
-import {SlippageControl} from './SlippageControl';
+import {SettingsPopover} from './SettingsPopover';
 
 export function SwapCard() {
   const {isConnected, address} = useAccount();
+  const {tokenIn, tokenOut, setTokenIn, setTokenOut, flip} = useSwapTokens();
 
-  const [tokenIn, setTokenIn] = useState<Token>(KASH);
-  const [tokenOut, setTokenOut] = useState<Token>(MUSDC ?? KASH);
   const [input, setInput] = useState('');
   const [slippageBps, setSlippageBps] = useState(50n);
   const [deadlineMinutes, setDeadlineMinutes] = useState(20);
@@ -83,9 +83,8 @@ export function SwapCard() {
   const insufficientBalance =
     amountIn !== null && balanceIn.value !== undefined && amountIn > balanceIn.value;
 
-  function flip() {
-    setTokenIn(tokenOut);
-    setTokenOut(tokenIn);
+  function onFlip() {
+    flip();
     setInput('');
     reset();
   }
@@ -98,7 +97,7 @@ export function SwapCard() {
 
     const path = [inAddr, outAddr] as const;
     const deadline = deadlineFromNow(deadlineMinutes);
-    // Execution is always bounded on-chain by amountOutMin -- the local quote is
+    // Execution is always bounded on-chain by amountOutMin; the local quote is
     // only a display estimate (llm.txt s42).
     const amountOutMin = quote.minReceived;
 
@@ -128,7 +127,7 @@ export function SwapCard() {
   }
 
   const label = (() => {
-    if (!isConnected) return 'Connect wallet';
+    if (!isConnected) return 'Get started';
     if (sameToken(tokenIn, tokenOut)) return 'Select different tokens';
     if (derivationMismatch) return 'Pool address mismatch';
     if (!input || amountIn === null || amountIn <= 0n) return 'Enter an amount';
@@ -142,7 +141,7 @@ export function SwapCard() {
     return 'Swap';
   })();
 
-  const disabled =
+  const blocked =
     !isConnected ||
     sameToken(tokenIn, tokenOut) ||
     derivationMismatch ||
@@ -155,53 +154,49 @@ export function SwapCard() {
 
   return (
     <div className="card">
-      <div className="card__header">
-        <h1 className="card__title">Swap</h1>
-      </div>
-
-      <div className="stack">
-        <AmountField
-          label="From"
-          token={tokenIn}
-          exclude={tokenOut}
-          value={input}
-          balance={balanceIn.value}
-          onValueChange={setInput}
-          onTokenChange={setTokenIn}
-        />
-
-        <div className="switch">
-          <button type="button" onClick={flip} aria-label="Switch tokens">
-            ↓
-          </button>
-        </div>
-
-        <AmountField
-          label="To (estimated)"
-          token={tokenOut}
-          exclude={tokenIn}
-          readOnly
-          value={quote ? formatAmount(quote.amountOut, tokenOut.decimals) : ''}
-          balance={balanceOut.value}
-          onTokenChange={setTokenOut}
-        />
-      </div>
-
-      <SlippageControl
+      <SettingsPopover
         slippageBps={slippageBps}
-        onChange={setSlippageBps}
+        onSlippageChange={setSlippageBps}
         deadlineMinutes={deadlineMinutes}
         onDeadlineChange={setDeadlineMinutes}
       />
 
-      {quote && (
+      <AmountField
+        label="Sell"
+        token={tokenIn}
+        exclude={tokenOut}
+        value={input}
+        balance={balanceIn.value}
+        onValueChange={setInput}
+        onTokenChange={setTokenIn}
+      />
+
+      <div className="switch">
+        <button type="button" onClick={onFlip} aria-label="Switch tokens">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+            <path d="M12 5v14m0 0-5-5m5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      </div>
+
+      <AmountField
+        label="Buy"
+        token={tokenOut}
+        exclude={tokenIn}
+        readOnly
+        value={quote ? formatAmount(quote.amountOut, tokenOut.decimals) : ''}
+        balance={balanceOut.value}
+        onTokenChange={setTokenOut}
+      />
+
+      {quote && amountIn !== null && (
         <div className="details">
           <div className="details__row">
             <span>Rate</span>
             <strong className="mono">
-              1 {tokenIn.symbol} ≈{' '}
+              1 {tokenIn.symbol} ={' '}
               {formatAmount(
-                (quote.amountOut * 10n ** BigInt(tokenIn.decimals)) / (amountIn as bigint),
+                (quote.amountOut * 10n ** BigInt(tokenIn.decimals)) / amountIn,
                 tokenOut.decimals,
               )}{' '}
               {tokenOut.symbol}
@@ -211,7 +206,14 @@ export function SwapCard() {
             <span>Price impact</span>
             <strong
               className="mono"
-              style={{color: severity === 'none' ? undefined : severity === 'warn' ? 'var(--warn)' : 'var(--danger)'}}
+              style={{
+                color:
+                  severity === 'none'
+                    ? undefined
+                    : severity === 'warn'
+                      ? 'var(--warn)'
+                      : 'var(--danger)',
+              }}
             >
               {formatBps(quote.impactBps)}
             </strong>
@@ -237,9 +239,8 @@ export function SwapCard() {
 
       {derivationMismatch && (
         <div className="alert alert--danger">
-          The pair address derived locally does not match the one the factory reports. The frontend&apos;s{' '}
-          <code>PAIR_INIT_CODE_HASH</code> is wrong for this deployment. Swapping is disabled until it is
-          corrected.
+          The pair address derived locally does not match the factory. This build&apos;s{' '}
+          <code>PAIR_INIT_CODE_HASH</code> is wrong for this deployment; swapping is disabled.
         </div>
       )}
 
@@ -255,18 +256,14 @@ export function SwapCard() {
         </div>
       )}
 
-      {error && (
-        <div className="alert alert--danger">
-          {error.message.slice(0, 220)}
-        </div>
-      )}
+      {error && <div className="alert alert--danger">{error.message.slice(0, 200)}</div>}
 
       {receipt.isSuccess && hash && (
-        <div className="alert alert--info">
+        <div className="alert alert--accent">
           Swap confirmed.{' '}
           {explorerTxUrl(hash) ? (
             <a href={explorerTxUrl(hash)} target="_blank" rel="noreferrer">
-              View on Blockscout
+              View on Blockscout ↗
             </a>
           ) : (
             <span className="mono">{hash}</span>
@@ -274,16 +271,16 @@ export function SwapCard() {
         </div>
       )}
 
-      <div style={{marginTop: 16}}>
-        <button
-          className={severity === 'severe' ? 'btn btn--danger' : 'btn'}
-          disabled={disabled && !needsApproval}
-          onClick={() => (needsApproval ? approve() : submit())}
-          type="button"
-        >
-          {label}
-        </button>
-      </div>
+      <button
+        className={
+          severity === 'severe' ? 'btn btn--danger' : needsApproval || !blocked ? 'btn btn--primary' : 'btn'
+        }
+        disabled={blocked && !needsApproval}
+        onClick={() => (needsApproval ? approve() : submit())}
+        type="button"
+      >
+        {label}
+      </button>
     </div>
   );
 }

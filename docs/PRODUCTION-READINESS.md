@@ -30,12 +30,38 @@ The full llm.txt s26 deployment order ran against chain id 9000, and s56's
 | Multi-hop mUSDT → WKASH → mUSDC | succeeded, delivered exactly the quoted amount |
 | Liquidity removal | succeeded, LP received principal plus accrued fees |
 | Blockscout verification | factory, router, mocks, WKASH verified; pairs bytecode-attested — explorer cannot register them, see below |
-| Deployment manifest | `deployments/ark-devnet.json` |
+| Deployment manifest | `packages/addresses/ark-devnet.json` |
 | Frontend | reads live reserves; UI quote matches the router exactly |
 
-Addresses are in `deployments/ark-devnet.json`.
+Addresses are in `packages/addresses/ark-devnet.json`.
 
 ---
+
+## Analytics backend: verified on devnet
+
+The indexer and API are analytics only. They hold no keys, sign nothing, and sit
+off the swap path — llm.txt s55 step 18 is the check that this is true rather
+than merely intended.
+
+| Check | Result |
+| --- | --- |
+| Swaps work with the API stopped (s55 step 18) | verified — the swap card still quoted 1 KASH = 1.204957 mUSDC from the chain, analytics degraded to "Analytics temporarily unavailable", no page errors |
+| Reserves reconcile with the chain | all 7 pairs match `getReserves()` exactly |
+| Pair count matches the factory | equals `allPairsLength()` |
+| Replay is idempotent | 5,000 indexed blocks reprocessed, zero duplicates |
+| Rebuild is deterministic | full drop and re-sync reproduced identical state |
+| Historical sync bounded | starts at the factory block; never scans from genesis |
+| Live sync | follows `newHeads` over WebSocket at block cadence, polling as the floor |
+| Snapshots | 18 hourly/daily rows; the five priced pairs sum to the $5,500,024 `/stats` reports |
+| Unpriceable pools | the two pools below the liquidity floor report null price and null TVL, never zero |
+| CORS | explicit allowlist; a `*` wildcard is refused at startup |
+| Container images | build on `scratch` with no shell or package manager, running as uid 10001 |
+
+**Not yet exercised:** a real reorg on Ark. The rollback path has unit coverage
+against PostgreSQL, and the cursor-header check runs on every tick, but the
+devnet has not reorganised underneath the indexer during this work.
+
+**Backend gates before production** are listed with the others below.
 
 ## Open items found during this deployment
 
@@ -138,6 +164,10 @@ From llm.txt s53. None of these can be cleared by writing more code.
 - [ ] **Use a controlled deployment signing process** — not a loose EOA key in a `.env`.
 - [ ] **Publish the deployment manifest and canonical addresses.**
 - [ ] **Coordinate with the Ark core team** on timing, addresses and announcements.
+- [ ] **Confirm Ark's finality expectations** with the core team and set `INDEXER_CONFIRMATIONS` from that answer rather than the current default of 3 (llm.txt s18).
+- [ ] **Observe a real reorg** on Ark and confirm the rollback path behaves as its tests do.
+- [ ] **Add leader election** before running more than one aggregate-writing indexer; the compose file pins `replicas: 1` for exactly this reason (llm.txt s56).
+- [ ] **Put the API behind TLS and rate limiting**, and set `ALLOWED_ORIGINS` to the production origin only.
 
 ## Standing warnings
 

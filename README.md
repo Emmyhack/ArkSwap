@@ -144,7 +144,7 @@ assets in the token selector: choosing one never silently gives the other.
 
 `feeTo` is `address(0)` — the protocol fee is disabled and the full 0.30% stays
 with liquidity providers. Full metadata, transaction hashes and blocks are in
-[`deployments/ark-devnet.json`](deployments/ark-devnet.json).
+[`packages/addresses/ark-devnet.json`](packages/addresses/ark-devnet.json).
 
 ¹ **The pairs cannot be verified on this explorer, and the cause is upstream of
 ArkSwap.** The Ark devnet JSON-RPC node exposes no trace API — `debug_traceTransaction`,

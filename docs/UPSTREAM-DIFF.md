@@ -103,7 +103,7 @@ PAIR_INIT_CODE_HASH = 0x30820c342fc28c16c80e536d138c0c5290a90de3583c2a126a9e19b5
 Because §1 changes `ArkSwapPair` bytecode, Uniswap's historical hash
 (`0x96e8ac42...`) is invalid here and must never be copied (llm.txt s7). The value
 above is `keccak256(type(ArkSwapPair).creationCode)` under the exact compiler
-settings recorded in `foundry.toml` and `deployments/ark-devnet.json`.
+settings recorded in `foundry.toml` and `packages/addresses/ark-devnet.json`.
 
 Two tests gate it, and `script/DeployRouter.s.sol` refuses to broadcast if it drifts:
 

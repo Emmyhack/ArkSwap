@@ -161,7 +161,7 @@ These come from llm.txt s48 and remain true regardless of static analysis:
 - **ArkSwap's spot reserve price is not a secure oracle.** It is manipulable within a single transaction via flash swaps. External lending or derivatives protocols must not trust an instantaneous ArkSwap pool price. The `price0CumulativeLast`/`price1CumulativeLast` accumulators are TWAP *primitives*, and safe use requires the consumer to sample them over a meaningful window.
 - **Fee-on-transfer and rebasing tokens** must use the `SupportingFeeOnTransferTokens` router paths. The standard paths correctly revert (`ArkSwap: K`) rather than silently shortchanging the user — see `test_feeOnTransferRevertsOnStandardPath`.
 - **ERC-777 / callback tokens** can re-enter during `swap`'s optimistic transfer. The `lock` modifier blocks re-entry into the same pair; cross-pair interactions remain the integrator's responsibility.
-- **Token spoofing / malicious token lists** are a frontend concern. ArkSwap's registry is an explicit allowlist in `frontend/src/config/tokens.ts`, and devnet mocks carry a mandatory "no real value" badge.
+- **Token spoofing / malicious token lists** are a frontend concern. ArkSwap's registry is an explicit allowlist in `apps/web/src/config/tokens.ts`, and devnet mocks carry a mandatory "no real value" badge.
 - **`feeToSetter` privilege** covers protocol-fee configuration only. It cannot seize liquidity, pause pairs, blacklist, or alter swap math. It should be a multisig for any long-lived deployment (llm.txt s25).
 
 ## What this review is not

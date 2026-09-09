@@ -117,10 +117,26 @@ func (ix *Indexer) SafeBlock(head uint64) uint64 {
 }
 
 // Run drives sync until the context is cancelled.
+//
+// A newHeads subscription wakes the loop as blocks land (llm.txt s17), and the
+// poll interval stays underneath it as a floor. The two are not alternatives:
+// the timer guarantees progress if the socket goes quiet without erroring, and
+// the subscription only removes the wait between a block landing and the next
+// tick. Nothing about what gets indexed depends on which one fired — Tick reads
+// its own cursor and the confirmed head over HTTP either way, so a missed or
+// duplicated notification cannot skip or double-count a block (llm.txt s20).
 func (ix *Indexer) Run(ctx context.Context, pollInterval time.Duration) error {
 	if err := ix.Preflight(ctx); err != nil {
 		return err
 	}
+
+	stream := ix.subscribeHeads(ctx)
+	defer func() {
+		if stream != nil {
+			stream.Close()
+		}
+	}()
+
 	for {
 		if err := ix.Tick(ctx); err != nil {
 			if ctx.Err() != nil {
@@ -130,12 +146,52 @@ func (ix *Indexer) Run(ctx context.Context, pollInterval time.Duration) error {
 			// lost because the cursor only advances with committed data.
 			ix.log.Error("sync tick failed", "error", err)
 		}
+
+		var heads <-chan uint64
+		var subErr <-chan error
+		if stream != nil {
+			heads, subErr = stream.Heads(), stream.Err()
+		}
+
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
+
+		case <-heads:
+			// A block landed; loop straight back into Tick.
+
+		case err := <-subErr:
+			// Degrade to polling rather than stopping. A dead socket slows the
+			// indexer down; it must not stop it indexing.
+			ix.log.Warn("newHeads subscription lost; falling back to polling", "error", err)
+			stream.Close()
+			stream = nil
+
 		case <-time.After(pollInterval):
+			// Reconnect opportunistically once the socket has dropped.
+			if stream == nil && ix.cfg.WSURL != "" {
+				stream = ix.subscribeHeads(ctx)
+			}
 		}
 	}
+}
+
+// subscribeHeads opens a newHeads subscription, or returns nil to poll.
+//
+// A missing or unreachable WebSocket is a latency problem, never a correctness
+// one, so it is logged and stepped over rather than failing startup.
+func (ix *Indexer) subscribeHeads(ctx context.Context) *chain.HeadStream {
+	if ix.cfg.WSURL == "" {
+		ix.log.Info("no ARK_WS_URL configured; polling for new blocks")
+		return nil
+	}
+	stream, err := chain.SubscribeHeads(ctx, ix.cfg.WSURL, ix.log)
+	if err != nil {
+		ix.log.Warn("newHeads unavailable; polling for new blocks", "error", err)
+		return nil
+	}
+	ix.log.Info("following the chain head over WebSocket", "url", ix.cfg.WSURL)
+	return stream
 }
 
 // Tick advances the indexer by at most one batch.

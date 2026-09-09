@@ -244,6 +244,13 @@ pnpm sdk:test                          # analytics client (node --test)
 starts there and **never scans from genesis**; `docker-compose.yml` fails fast if
 it is unset rather than silently starting a scan that would take days.
 
+Once caught up it follows the chain head over `ARK_WS_URL` (`newHeads`), which
+brings the lag from a poll interval down to about a block. The poll timer stays
+underneath as a floor: what gets indexed never depends on which of the two
+fired, because each tick re-reads the cursor and the confirmed head over HTTP.
+An unreachable WebSocket is therefore a latency problem, not a correctness one —
+the indexer logs it, polls instead, and reconnects when the socket comes back.
+
 ### Endpoints
 
 `GET /api/v1` — `health`, `stats`, `pairs`, `pairs/{address}`,

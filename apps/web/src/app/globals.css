@@ -774,3 +774,31 @@ button { font-family: inherit; }
   .trades__amounts { grid-column: 1; }
   .trades__age { grid-column: 2; }
 }
+
+/* --- Pool chart ---------------------------------------------------------- */
+.pool-chart { margin: 22px auto 0; max-width: 680px; padding: 4px 0 14px; }
+.pool-chart .card__header { align-items: flex-start; }
+.pool-chart__sub { display: block; margin-top: 3px; color: var(--muted); font-size: 13px; }
+.pool-chart__toggle { display: flex; gap: 4px; }
+.pool-chart__toggle button {
+  background: var(--surface-2);
+  border: 1px solid transparent;
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pool-chart__toggle button.is-active { color: var(--accent-hi); border-color: var(--accent); }
+.pool-chart__empty { padding: 26px 18px; color: var(--muted); font-size: 13.5px; line-height: 1.6; }
+.pool-chart__canvas { padding: 6px 14px 0; }
+.pool-chart__canvas svg { width: 100%; height: 160px; display: block; }
+.pool-chart__axis {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 2px 0;
+  color: var(--faint);
+  font-size: 12px;
+}
+.pool-chart__legend { color: var(--muted); }

@@ -2,6 +2,7 @@ import {ConfigGate} from '@/components/ConfigGate';
 import {DevnetBanner} from '@/components/DevnetBanner';
 import {Footer} from '@/components/Footer';
 import {LiquidityCard} from '@/components/LiquidityCard';
+import {PoolChart} from '@/components/PoolChart';
 
 export default function PoolPage() {
   return (
@@ -17,6 +18,7 @@ export default function PoolPage() {
 
       <ConfigGate>
         <LiquidityCard />
+        <PoolChart />
       </ConfigGate>
 
       <p className="hero__sub">

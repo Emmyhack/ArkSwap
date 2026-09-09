@@ -55,9 +55,19 @@ than merely intended.
 | Snapshots | 18 hourly/daily rows; the five priced pairs sum to the $5,500,024 `/stats` reports |
 | Unpriceable pools | the two pools below the liquidity floor report null price and null TVL, never zero |
 | CORS | explicit allowlist; a `*` wildcard is refused at startup |
-| Container images | build on `scratch` with no shell or package manager, running as uid 10001 |
+| Container images | Go stages build; both binaries cross-compile to statically linked linux/amd64, which is what the `scratch` runtime stage needs. **The image build itself has not completed here** — the registry is unreachable from this machine, see below |
 
-**Not yet exercised:** a real reorg on Ark. The rollback path has unit coverage
+**Not yet exercised:** the container images. `docker build` fails on this
+machine fetching from Docker Hub and the Alpine CDN — the same network
+restriction that blocked Homebrew bottles during the deployment. The Dockerfile
+was corrected as far as that failure could be reasoned about (a `.dockerignore`,
+since the build context was the whole 1.8 GB working tree; and a `scratch`
+runtime stage, so the final images install nothing at build time and carry no
+shell or package manager), and the Go build commands were verified by running
+them directly for linux/amd64. **Someone with registry access must run
+`docker compose up --build` before this is trusted.**
+
+**Also not yet exercised:** a real reorg on Ark. The rollback path has unit coverage
 against PostgreSQL, and the cursor-header check runs on every tick, but the
 devnet has not reorganised underneath the indexer during this work.
 

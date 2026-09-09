@@ -24,17 +24,27 @@ COPY apps/indexer ./apps/indexer
 # The deployment manifest is the canonical address record both binaries read.
 COPY packages/addresses ./packages/addresses
 
-# CGO is off so the binaries run on a distroless/static base.
+# CGO is off and the timezone database is compiled in, so the binaries carry
+# everything they need and the runtime image can be empty.
 ENV CGO_ENABLED=0 GOOS=linux
-RUN go build -trimpath -ldflags="-s -w" -o /out/arkswap-indexer ./apps/indexer/cmd/indexer
-RUN go build -trimpath -ldflags="-s -w" -o /out/arkswap-api     ./apps/api/cmd/api
+RUN go build -trimpath -tags timetzdata -ldflags="-s -w" -o /out/arkswap-indexer ./apps/indexer/cmd/indexer
+RUN go build -trimpath -tags timetzdata -ldflags="-s -w" -o /out/arkswap-api     ./apps/api/cmd/api
+
+# The runtime image has no shell, so the unprivileged user is minted here.
+RUN echo 'arkswap:x:10001:10001::/app:/sbin/nologin' > /out/passwd \
+ && echo 'arkswap:x:10001:' > /out/group
 
 # --- runtime bases -------------------------------------------------------
-# No compiler or toolchain in the final images (llm.txt s52).
-FROM alpine:3.20 AS runtime-base
-RUN apk add --no-cache ca-certificates tzdata \
- && adduser -D -u 10001 arkswap
-USER 10001
+# Scratch: no compiler, no package manager, no shell (llm.txt s52). The binaries
+# are static, so the only things the image needs are the CA bundle for TLS to
+# the RPC endpoint and a passwd entry for the unprivileged user — both copied
+# from the builder rather than installed, which also means the runtime stage
+# fetches nothing at build time.
+FROM scratch AS runtime-base
+COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+COPY --from=build /out/passwd /etc/passwd
+COPY --from=build /out/group /etc/group
+USER 10001:10001
 WORKDIR /app
 # Canonical addresses travel with the image so a container needs no bind mount.
 COPY --from=build /src/packages/addresses /app/packages/addresses

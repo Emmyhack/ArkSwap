@@ -1,0 +1,38 @@
+# The Go images need three modules and the address manifest, nothing else.
+# Without this the daemon uploads the whole 1.8 GB working tree — mostly
+# node_modules and build output that never reaches the image.
+
+# Frontend and TypeScript toolchain
+node_modules
+**/node_modules
+apps/web
+packages/abis
+packages/config
+packages/sdk
+packages/types
+.next
+**/.next
+.turbo
+**/.turbo
+
+# Contract toolchain: compiled artefacts are rebuilt, never shipped
+packages/contracts
+broadcast
+**/broadcast
+
+# History, docs, local state
+.git
+.github
+docs
+*.md
+LICENSES
+
+# Secrets must never enter a build context, even to be ignored later
+.env
+.env.*
+!.env.example
+
+# Local binaries and scratch output
+/api
+/indexer
+*.log

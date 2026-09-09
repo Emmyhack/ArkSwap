@@ -24,6 +24,12 @@ packages/addresses/local-preview.json
 # Turborepo
 .turbo/
 
-# Go build output
+# Go build output. `go build ./apps/...` drops binaries in the working directory,
+# so the bare names are ignored at the repo root too.
 apps/api/bin/
 apps/indexer/bin/
+/api
+/indexer
+
+# Local Postgres data if someone runs it outside Docker
+pgdata/

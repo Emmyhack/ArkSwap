@@ -1,0 +1,18 @@
+BEGIN;
+DROP INDEX IF EXISTS token_prices_latest_idx;
+DROP INDEX IF EXISTS tokens_symbol_idx;
+DROP INDEX IF EXISTS pairs_created_block_idx;
+DROP INDEX IF EXISTS pairs_token1_idx;
+DROP INDEX IF EXISTS pairs_token0_idx;
+DROP INDEX IF EXISTS pair_snapshots_block_idx;
+DROP INDEX IF EXISTS pair_snapshots_lookup_idx;
+DROP INDEX IF EXISTS liquidity_events_block_number_idx;
+DROP INDEX IF EXISTS liquidity_events_pair_timestamp_idx;
+DROP INDEX IF EXISTS swaps_token_out_idx;
+DROP INDEX IF EXISTS swaps_token_in_idx;
+DROP INDEX IF EXISTS swaps_recipient_idx;
+DROP INDEX IF EXISTS swaps_sender_idx;
+DROP INDEX IF EXISTS swaps_block_number_idx;
+DROP INDEX IF EXISTS swaps_timestamp_idx;
+DROP INDEX IF EXISTS swaps_pair_timestamp_idx;
+COMMIT;

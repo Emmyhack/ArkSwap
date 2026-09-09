@@ -53,3 +53,32 @@ func cloneOrZero(v *big.Int) *big.Int {
 	}
 	return new(big.Int).Set(v)
 }
+
+// StableLegUSD values a swap from whichever side is an approved USD anchor.
+//
+// llm.txt s27 wants one side counted, never both, so a $100 trade contributes
+// about $100 rather than $200. Using the stablecoin leg has a property the
+// reserve-derived alternative lacks: it is exact and HISTORICAL. The swap event
+// itself carries the amount that changed hands, so backfilling old blocks yields
+// the value at the time of the trade rather than today's pool price applied
+// retroactively.
+//
+// Returns nil when neither side is an anchor. nil means "unknown", which callers
+// must not sum as zero (llm.txt s23).
+func StableLegUSD(
+	tokenIn models.Token, amountIn *big.Int,
+	tokenOut models.Token, amountOut *big.Int,
+) *big.Rat {
+	// The input side is preferred: it is what the trader actually paid.
+	if tokenIn.IsStable {
+		if v, ok := models.ScaleDown(amountIn, tokenIn.Decimals); ok {
+			return v
+		}
+	}
+	if tokenOut.IsStable {
+		if v, ok := models.ScaleDown(amountOut, tokenOut.Decimals); ok {
+			return v
+		}
+	}
+	return nil
+}

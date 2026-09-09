@@ -1,0 +1,75 @@
+# ArkSwap analytics stack (llm.txt s52).
+#
+# The indexer and API run as separate services sharing one PostgreSQL. Neither
+# holds a key, and neither sits on the swap path: stopping this entire stack must
+# leave trading working, because the frontend talks to the chain directly for
+# anything that moves funds (llm.txt s38, s55 step 18).
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: arkswap
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-arkswap}
+      POSTGRES_DB: arkswap
+    ports:
+      - "5432:5432"
+    volumes:
+      - arkswap-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U arkswap -d arkswap"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  indexer:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.go
+      target: indexer
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Never baked into the image; supplied at run time (llm.txt s4).
+      ARK_RPC_URL: ${ARK_RPC_URL:?ARK_RPC_URL is required}
+      ARK_WS_URL: ${ARK_WS_URL:-}
+      ARK_EVM_CHAIN_ID: ${ARK_EVM_CHAIN_ID:?ARK_EVM_CHAIN_ID is required}
+      ARKSWAP_FACTORY_ADDRESS: ${ARKSWAP_FACTORY_ADDRESS:-}
+      ARKSWAP_FACTORY_DEPLOYMENT_BLOCK: ${ARKSWAP_FACTORY_DEPLOYMENT_BLOCK:?required — never scan from genesis}
+      WKASH_ADDRESS: ${WKASH_ADDRESS:-}
+      DATABASE_URL: postgres://arkswap:${POSTGRES_PASSWORD:-arkswap}@postgres:5432/arkswap?sslmode=disable
+      INDEXER_CONFIRMATIONS: ${INDEXER_CONFIRMATIONS:-3}
+      BLOCK_BATCH_SIZE: ${BLOCK_BATCH_SIZE:-2000}
+      MAX_RPC_RETRIES: ${MAX_RPC_RETRIES:-5}
+      RPC_TIMEOUT_SECONDS: ${RPC_TIMEOUT_SECONDS:-15}
+      MIN_PRICE_LIQUIDITY_USD: ${MIN_PRICE_LIQUIDITY_USD:-1000}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    # Exactly one aggregate-writing indexer until leader election exists
+    # (llm.txt s56).
+    deploy:
+      replicas: 1
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.go
+      target: api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${API_PORT:-8080}:8080"
+    environment:
+      ARK_RPC_URL: ${ARK_RPC_URL:-}
+      ARK_EVM_CHAIN_ID: ${ARK_EVM_CHAIN_ID:?ARK_EVM_CHAIN_ID is required}
+      DATABASE_URL: postgres://arkswap:${POSTGRES_PASSWORD:-arkswap}@postgres:5432/arkswap?sslmode=disable
+      API_PORT: 8080
+      # Never "*" in production; config refuses a wildcard (llm.txt s44).
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000}
+      MIN_PRICE_LIQUIDITY_USD: ${MIN_PRICE_LIQUIDITY_USD:-1000}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    restart: unless-stopped
+
+volumes:
+  arkswap-pgdata:

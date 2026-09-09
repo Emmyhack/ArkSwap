@@ -90,3 +90,47 @@ func TestNormalizeSwapDoesNotAliasRawAmounts(t *testing.T) {
 		t.Fatalf("raw Amount0In was mutated to %v", s.Amount0In)
 	}
 }
+
+func dp(i int) *int { return &i }
+
+func TestStableLegUSDPrefersInputSide(t *testing.T) {
+	usdc := models.Token{Address: t1, Decimals: dp(6), IsStable: true}
+	wkash := models.Token{Address: t0, Decimals: dp(18)}
+
+	// 1.5 mUSDC in -> some WKASH out. Value is the stable side: $1.50.
+	got := StableLegUSD(usdc, big.NewInt(1_500_000), wkash, big.NewInt(1))
+	if got == nil || got.FloatString(2) != "1.50" {
+		t.Fatalf("got %v, want 1.50", got)
+	}
+}
+
+func TestStableLegUSDFallsBackToOutputSide(t *testing.T) {
+	usdc := models.Token{Address: t1, Decimals: dp(6), IsStable: true}
+	wkash := models.Token{Address: t0, Decimals: dp(18)}
+
+	// 1 WKASH in -> 0.972754 mUSDC out.
+	amtIn, _ := new(big.Int).SetString("1000000000000000000", 10)
+	got := StableLegUSD(wkash, amtIn, usdc, big.NewInt(972_754))
+	if got == nil || got.FloatString(6) != "0.972754" {
+		t.Fatalf("got %v, want 0.972754", got)
+	}
+}
+
+// Counting both legs is the classic way a DEX dashboard reports double the real
+// volume; only one side may ever be used.
+func TestStableLegUSDCountsOneSideOnly(t *testing.T) {
+	a := models.Token{Address: t0, Decimals: dp(6), IsStable: true}
+	b := models.Token{Address: t1, Decimals: dp(6), IsStable: true}
+	got := StableLegUSD(a, big.NewInt(100_000_000), b, big.NewInt(99_700_000))
+	if got == nil || got.FloatString(2) != "100.00" {
+		t.Fatalf("got %v, want exactly 100.00 (both sides would be ~199.70)", got)
+	}
+}
+
+func TestStableLegUSDUnknownWhenNoAnchor(t *testing.T) {
+	a := models.Token{Address: t0, Decimals: dp(18)}
+	b := models.Token{Address: t1, Decimals: dp(8)}
+	if got := StableLegUSD(a, big.NewInt(1), b, big.NewInt(1)); got != nil {
+		t.Fatalf("expected nil for a swap with no stable leg, got %v", got)
+	}
+}

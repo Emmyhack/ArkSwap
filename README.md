@@ -198,9 +198,9 @@ roughly 25k gas; without the headroom a swap can leave the pair's `SSTORE` with
 ## Frontend
 
 ```bash
-cd frontend
-cp .env.example .env.local   # fill from deployments/ark-devnet.json
-npm install && npm run dev
+pnpm install
+cp apps/web/.env.example apps/web/.env.local   # fill from packages/addresses/ark-devnet.json
+pnpm web:dev                                   # :3000
 ```
 
 Next.js + TypeScript + wagmi + viem, with `/swap` and `/pool` routes. There are
@@ -213,6 +213,66 @@ always bounded on-chain by `amountOutMin` / `amountInMax`. `amountOutMin = 0` is
 never sent: zero is not offered as a slippage preset and is rejected on entry.
 Price impact is shown separately from the 0.30% LP fee, and trades above 15%
 impact are blocked outright.
+
+## Backend status
+
+The indexer and API are **analytics only**. They are non-custodial, never sign a
+transaction, and are not on the swap path: swapping, adding liquidity and
+removing liquidity talk to the chain directly through the user's wallet. With the
+API stopped the app still quotes and executes trades and the analytics panels
+show "Analytics temporarily unavailable" — this is verified behaviour, not an
+aspiration.
+
+PostgreSQL holds a **rebuildable projection of chain history**, never a source of
+truth. Dropping the database and re-syncing reproduces the same state; every
+event is keyed on `(tx_hash, log_index)` so replaying a range is idempotent.
+
+```bash
+createdb arkswap                       # or: docker compose up -d postgres
+cp .env.example .env                   # fill DATABASE_URL and the factory block
+
+pnpm indexer:dev                       # historical sync, then follow the head
+pnpm indexer:once                      # one pass, useful in CI
+pnpm api:dev                           # :8080
+
+pnpm go:build
+pnpm go:test
+pnpm sdk:test                          # analytics client (node --test)
+```
+
+`ARKSWAP_FACTORY_DEPLOYMENT_BLOCK` is required and has no default. The indexer
+starts there and **never scans from genesis**; `docker-compose.yml` fails fast if
+it is unset rather than silently starting a scan that would take days.
+
+### Endpoints
+
+`GET /api/v1` — `health`, `stats`, `pairs`, `pairs/{address}`,
+`pairs/{address}/swaps`, `pairs/{address}/liquidity`, `pairs/{address}/chart`,
+`tokens`, `tokens/{address}`, `tokens/{address}/price`,
+`accounts/{address}/swaps`.
+
+Reads only. There is no write path, no key custody, and no endpoint that can move
+funds. `ALLOWED_ORIGINS` is an explicit allowlist — `*` is rejected at startup.
+
+### Pricing and what stays null
+
+Prices are derived from pool reserves against a stablecoin anchor: a direct
+stable pair first, then a hop through WKASH, preferring the deepest pool. A pool
+thinner than `MIN_PRICE_LIQUIDITY_USD` is **not** used as a price source, so a
+token with no route to a stablecoin reports `priceUsd: null` and its pair reports
+`tvlUsd: null`. Volume is counted on one side of each swap only, never both.
+
+Null is deliberate. An unpriceable pool is reported as unpriceable rather than
+assigned a number the chain does not support, and `/stats` returns
+`pairsUnpriced` so a caller can see how much of the protocol that covers.
+
+### Correctness
+
+Verified against the live devnet: reserves for all 7 pairs reconcile exactly with
+`getReserves()`, the indexed pair count matches `allPairsLength()`, replaying
+5,000 indexed blocks produces zero duplicates, and a full drop-and-resync
+reproduces identical state. Reorgs are handled by re-reading the cursor header
+and walking back to the common ancestor.
 
 ## Security
 

@@ -304,6 +304,37 @@ func (t *Tx) SetPairReserves(ctx context.Context, pair string, r0, r1 *big.Int, 
 	return nil
 }
 
+// UpsertPairSnapshot records a pair's state at the close of a time bucket.
+//
+// Last write in the bucket wins, which gives close semantics: replaying the
+// bucket's Sync events in order leaves the same row a fresh sync would, so a
+// rebuilt database produces an identical series.
+//
+// Volume and transaction counts are deliberately not written here. They are
+// aggregated from the swaps table at read time, which keeps one source of truth
+// for volume and means a reorg that removes swaps corrects the chart without a
+// second set of counters to unwind.
+func (t *Tx) UpsertPairSnapshot(ctx context.Context, snap models.PairSnapshot) error {
+	_, err := t.tx.Exec(ctx, `
+		INSERT INTO pair_snapshots (
+			pair_address, bucket_seconds, timestamp_bucket,
+			reserve0, reserve1, token0_price_usd, token1_price_usd, tvl_usd
+		) VALUES ($1, $2, $3, $4::numeric, $5::numeric, $6::numeric, $7::numeric, $8::numeric)
+		ON CONFLICT (pair_address, bucket_seconds, timestamp_bucket) DO UPDATE
+		   SET reserve0         = EXCLUDED.reserve0,
+		       reserve1         = EXCLUDED.reserve1,
+		       token0_price_usd = EXCLUDED.token0_price_usd,
+		       token1_price_usd = EXCLUDED.token1_price_usd,
+		       tvl_usd          = EXCLUDED.tvl_usd`,
+		snap.PairAddress, snap.BucketSeconds, snap.TimestampBucket,
+		num(snap.Reserve0), num(snap.Reserve1),
+		numPtr(snap.Token0PriceUSD), numPtr(snap.Token1PriceUSD), numPtr(snap.TVLUSD))
+	if err != nil {
+		return fmt.Errorf("database: snapshotting %s: %w", snap.PairAddress, err)
+	}
+	return nil
+}
+
 func (t *Tx) SetPairTotalSupply(ctx context.Context, pair string, supply *big.Int) error {
 	_, err := t.tx.Exec(ctx,
 		`UPDATE pairs SET total_supply = $2::numeric, updated_at = now() WHERE address = $1`,
@@ -411,6 +442,21 @@ func (t *Tx) InsertLiquidityEvent(ctx context.Context, e models.LiquidityEvent) 
 // exactly. Pair reserves are NOT reconstructed here: the caller replays the
 // canonical blocks, and the Sync events in them restore authoritative reserves.
 func (t *Tx) RollbackFrom(ctx context.Context, block uint64) error {
+	// Snapshots are keyed by time bucket, not by block, so they cannot be deleted
+	// by block range. Drop every bucket the orphaned blocks touched: the replay
+	// rewrites the ones that still have a Sync, and a bucket whose only Sync was
+	// orphaned correctly disappears instead of lingering as a stale close.
+	// This must run before the blocks themselves are deleted.
+	if _, err := t.tx.Exec(ctx, `
+		WITH cutoff AS (SELECT min(timestamp) AS ts FROM blocks WHERE number >= $1)
+		DELETE FROM pair_snapshots ps
+		 USING cutoff c
+		 WHERE c.ts IS NOT NULL
+		   AND ps.timestamp_bucket >= (c.ts / ps.bucket_seconds) * ps.bucket_seconds`,
+		block); err != nil {
+		return fmt.Errorf("database: dropping snapshots from %d: %w", block, err)
+	}
+
 	for _, stmt := range []string{
 		`DELETE FROM swaps WHERE block_number >= $1`,
 		`DELETE FROM liquidity_events WHERE block_number >= $1`,

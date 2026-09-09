@@ -266,6 +266,14 @@ Null is deliberate. An unpriceable pool is reported as unpriceable rather than
 assigned a number the chain does not support, and `/stats` returns
 `pairsUnpriced` so a caller can see how much of the protocol that covers.
 
+Charts read the same way. The indexer writes an hourly and a daily snapshot for
+each pair whose reserves changed, closing the bucket with the prices in force at
+that point rather than today's prices applied backwards — a chart built from
+retroactive prices shows a history that never happened. Volume and transaction
+counts still come from the swaps table, so there is one source of truth for
+volume and a reorg that removes swaps corrects the chart with no second set of
+counters to unwind.
+
 ### Correctness
 
 Verified against the live devnet: reserves for all 7 pairs reconcile exactly with

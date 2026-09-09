@@ -12,11 +12,13 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 
+	"github.com/Emmyhack/ArkSwap/packages/gointernal/analytics"
 	"github.com/Emmyhack/ArkSwap/packages/gointernal/chain"
 	"github.com/Emmyhack/ArkSwap/packages/gointernal/config"
 	"github.com/Emmyhack/ArkSwap/packages/gointernal/contracts"
 	"github.com/Emmyhack/ArkSwap/packages/gointernal/database"
 	"github.com/Emmyhack/ArkSwap/packages/gointernal/models"
+	"github.com/Emmyhack/ArkSwap/packages/gointernal/pricing"
 	"github.com/Emmyhack/ArkSwap/packages/gointernal/processor"
 )
 
@@ -374,6 +376,9 @@ func (ix *Indexer) processBlock(ctx context.Context, number uint64, logs []types
 				return err
 			}
 		}
+		if err := ix.snapshotPairs(ctx, tx, header, syncedPairs(logs)); err != nil {
+			return err
+		}
 		return tx.SetIndexerState(ctx, models.IndexerState{
 			ChainID: ix.cfg.ChainID, LastProcessedBlock: number, LastProcessedBlockHash: header.Hash,
 		})
@@ -432,7 +437,17 @@ func (ix *Indexer) applyLog(ctx context.Context, tx *database.Tx, l types.Log, h
 			ix.log.Warn("skipping malformed Sync", "tx", l.TxHash.Hex(), "error", err)
 			return nil
 		}
-		return tx.SetPairReserves(ctx, pairAddr, ev.Reserve0, ev.Reserve1, l.BlockNumber)
+		if err := tx.SetPairReserves(ctx, pairAddr, ev.Reserve0, ev.Reserve1, l.BlockNumber); err != nil {
+			return err
+		}
+		// Mirror the write into the in-memory pair set. Snapshots and the pricing
+		// engine both read from it, and a stale copy here would price this block
+		// against the previous block's reserves.
+		if p, ok := ix.knownPairs[pairAddr]; ok {
+			p.Reserve0, p.Reserve1, p.LastSyncBlock = ev.Reserve0, ev.Reserve1, &l.BlockNumber
+			ix.knownPairs[pairAddr] = p
+		}
+		return nil
 
 	case contracts.TopicSwap:
 		ev, err := contracts.DecodeSwap(l)
@@ -537,6 +552,98 @@ func (ix *Indexer) SyncToHead(ctx context.Context) error {
 // At equilibrium a constant-product pool holds equal value on both sides, so one
 // priced side times two is the standard estimate for the whole deposit. Returns
 // nil when neither side is an anchor rather than guessing.
+// syncedPairs lists the pairs whose reserves changed in a block.
+//
+// Sync is the only event that moves reserves, so it is the only one that can
+// change a bucket's close. Blocks with no Sync write no snapshots at all, which
+// keeps the table proportional to activity rather than to chain length.
+func syncedPairs(logs []types.Log) []string {
+	seen := map[string]struct{}{}
+	var out []string
+	for _, l := range logs {
+		if len(l.Topics) == 0 || l.Topics[0] != contracts.TopicSync {
+			continue
+		}
+		addr := models.NormalizeAddress(l.Address.Hex())
+		if _, dup := seen[addr]; dup {
+			continue
+		}
+		seen[addr] = struct{}{}
+		out = append(out, addr)
+	}
+	return out
+}
+
+// snapshotPairs closes the hour and day buckets containing this block for every
+// pair whose reserves just changed.
+//
+// Prices are computed from the reserves as they stand in this block, never from
+// today's pool state applied backwards: a chart built from retroactive prices
+// shows a history that never happened (llm.txt s27). A pool with no route to a
+// stablecoin stores its reserves with NULL prices and NULL TVL rather than a
+// fabricated series (llm.txt s26).
+func (ix *Indexer) snapshotPairs(ctx context.Context, tx *database.Tx, header *models.Block, pairs []string) error {
+	if len(pairs) == 0 {
+		return nil
+	}
+	engine := ix.pricingEngine()
+
+	for _, addr := range pairs {
+		p, ok := ix.knownPairs[addr]
+		if !ok {
+			continue // not a factory pair; not canonical (llm.txt s15)
+		}
+		t0, t1 := ix.knownTokens[p.Token0Address], ix.knownTokens[p.Token1Address]
+
+		var price0, price1 *big.Rat
+		if pr := engine.PriceUSD(t0); pr != nil {
+			price0 = pr.USD
+		}
+		if pr := engine.PriceUSD(t1); pr != nil {
+			price1 = pr.USD
+		}
+
+		snap := models.PairSnapshot{
+			PairAddress:    addr,
+			Reserve0:       p.Reserve0,
+			Reserve1:       p.Reserve1,
+			Token0PriceUSD: price0,
+			Token1PriceUSD: price1,
+			TVLUSD:         analytics.PairTVL(p.Reserve0, t0, price0, p.Reserve1, t1, price1),
+		}
+
+		for _, bucket := range []uint64{models.BucketHour, models.BucketDay} {
+			snap.BucketSeconds = bucket
+			snap.TimestampBucket = models.FloorBucket(header.Timestamp, bucket)
+			if err := tx.UpsertPairSnapshot(ctx, snap); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// pricingEngine prices against every known pair at its current reserves.
+//
+// The whole pair set is used, not just the pair being snapshotted: pricing a
+// token may need a hop through WKASH, which lives in a different pool.
+func (ix *Indexer) pricingEngine() *pricing.Engine {
+	pools := make([]pricing.Pool, 0, len(ix.knownPairs))
+	for _, p := range ix.knownPairs {
+		pools = append(pools, pricing.Pool{
+			Address:  p.Address,
+			Token0:   ix.knownTokens[p.Token0Address],
+			Token1:   ix.knownTokens[p.Token1Address],
+			Reserve0: p.Reserve0,
+			Reserve1: p.Reserve1,
+		})
+	}
+	// Map iteration order is random; sorting keeps a tie between two equally deep
+	// pools from resolving differently on separate runs.
+	pricing.SortPoolsByAddress(pools)
+	return pricing.NewEngine(pools, ix.cfg.MinPriceLiquidityUSD)
+}
+
 func (ix *Indexer) liquidityUSD(pairAddr string, amount0, amount1 *big.Int) *big.Rat {
 	p, ok := ix.knownPairs[pairAddr]
 	if !ok {

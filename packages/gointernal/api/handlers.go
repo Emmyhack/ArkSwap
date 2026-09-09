@@ -265,19 +265,30 @@ func (s *Server) pairChart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Both token prices are reported rather than a single "price", because a pair
+	// chart has two sides and naming one of them "the" price leaves the caller
+	// guessing which. Each is the bucket's closing USD price.
 	type point struct {
-		Timestamp int64   `json:"timestamp"`
-		Price     *string `json:"price"`
-		TvlUsd    *string `json:"tvlUsd"`
-		VolumeUsd string  `json:"volumeUsd"`
-		TxCount   int64   `json:"txCount"`
+		Timestamp      int64   `json:"timestamp"`
+		Token0PriceUsd *string `json:"token0PriceUsd"`
+		Token1PriceUsd *string `json:"token1PriceUsd"`
+		TvlUsd         *string `json:"tvlUsd"`
+		VolumeUsd      string  `json:"volumeUsd"`
+		TxCount        int64   `json:"txCount"`
 	}
 	out := make([]point, 0, len(points))
 	for _, p := range points {
-		// price and tvlUsd are null by design: reconstructing them needs
-		// per-block reserve snapshots, which the MVP does not record. Reporting
-		// today's price against a historical bucket would be a fabricated series.
-		out = append(out, point{Timestamp: p.Bucket, VolumeUsd: models.FormatUSD(p.VolumeUSD), TxCount: p.TxCount})
+		// Null means "not priceable", never zero: a pool with no route to a
+		// stablecoin has no USD price, and reporting zero would understate the
+		// series rather than visibly omit it (llm.txt s26).
+		out = append(out, point{
+			Timestamp:      p.Bucket,
+			Token0PriceUsd: usd(p.Token0PriceUSD),
+			Token1PriceUsd: usd(p.Token1PriceUSD),
+			TvlUsd:         usd(p.TVLUSD),
+			VolumeUsd:      models.FormatUSD(p.VolumeUSD),
+			TxCount:        p.TxCount,
+		})
 	}
 	writeJSON(w, http.StatusOK, dataEnvelope{Data: out})
 }

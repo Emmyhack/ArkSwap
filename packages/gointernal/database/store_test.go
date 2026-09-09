@@ -4,7 +4,9 @@ import (
 	"context"
 	"math/big"
 	"os"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/Emmyhack/ArkSwap/packages/gointernal/models"
 )
@@ -322,5 +324,197 @@ func TestLowercaseAddressConstraint(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected the lowercase constraint to reject a mixed-case address")
+	}
+}
+
+// A bucket's snapshot is its close: the last Sync in the bucket wins, so a
+// replay of the same events leaves the same row (llm.txt s20).
+func TestPairSnapshotKeepsTheBucketClose(t *testing.T) {
+	s := testStore(t)
+	seedPair(t, s)
+	ctx := context.Background()
+
+	const bucket = uint64(models.BucketHour)
+	base := uint64(1788404000)
+	start := models.FloorBucket(base, bucket)
+
+	write := func(r0, r1 string, tvl *big.Rat) {
+		if err := s.InBlockTx(ctx, func(tx *Tx) error {
+			return tx.UpsertPairSnapshot(ctx, models.PairSnapshot{
+				PairAddress: pair, BucketSeconds: bucket, TimestampBucket: start,
+				Reserve0: mustInt(r0), Reserve1: mustInt(r1),
+				Token0PriceUSD: big.NewRat(2, 1), Token1PriceUSD: big.NewRat(1, 1),
+				TVLUSD: tvl,
+			})
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("1000000000000000000", "1000000", big.NewRat(3, 1))
+	write("2000000000000000000", "2000000", big.NewRat(6, 1))
+
+	var rows int
+	var r0, tvl string
+	if err := s.pool.QueryRow(ctx,
+		`SELECT count(*) OVER (), reserve0::text, tvl_usd::text FROM pair_snapshots`,
+	).Scan(&rows, &r0, &tvl); err != nil {
+		t.Fatal(err)
+	}
+	if rows != 1 {
+		t.Fatalf("rows = %d; the same bucket must be updated, not appended", rows)
+	}
+	if r0 != "2000000000000000000" {
+		t.Errorf("reserve0 = %s; want the last write in the bucket", r0)
+	}
+	if !strings.HasPrefix(tvl, "6") {
+		t.Errorf("tvl_usd = %s; want the last write in the bucket", tvl)
+	}
+}
+
+// An unpriceable pool records its reserves with NULL prices. Storing zero would
+// let a pool with no route to a stablecoin read as a pool worth nothing
+// (llm.txt s26).
+func TestPairSnapshotStoresUnknownPricesAsNull(t *testing.T) {
+	s := testStore(t)
+	seedPair(t, s)
+	ctx := context.Background()
+
+	if err := s.InBlockTx(ctx, func(tx *Tx) error {
+		return tx.UpsertPairSnapshot(ctx, models.PairSnapshot{
+			PairAddress: pair, BucketSeconds: models.BucketDay, TimestampBucket: 1788393600,
+			Reserve0: mustInt("5"), Reserve1: mustInt("7"),
+		})
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	var price0, tvl *string
+	if err := s.pool.QueryRow(ctx,
+		`SELECT token0_price_usd::text, tvl_usd::text FROM pair_snapshots`,
+	).Scan(&price0, &tvl); err != nil {
+		t.Fatal(err)
+	}
+	if price0 != nil || tvl != nil {
+		t.Fatalf("price0=%v tvl=%v; unknown must stay NULL, never 0", price0, tvl)
+	}
+}
+
+// The chart joins volume (from swaps) against price and TVL (from snapshots).
+// Buckets present on only one side must still appear, with the missing half
+// null rather than the whole bucket dropped.
+func TestChartBucketsJoinsSnapshotsAndSwaps(t *testing.T) {
+	s := testStore(t)
+	seedPair(t, s)
+	ctx := context.Background()
+
+	const bucket = int64(models.BucketHour)
+	// Two adjacent hours: the first traded, the second only moved liquidity.
+	traded := uint64(1788404400)
+	quiet := traded + uint64(bucket)
+
+	if err := s.InBlockTx(ctx, func(tx *Tx) error {
+		if err := tx.InsertBlock(ctx, models.Block{Number: 177700, Hash: "0xs1", ParentHash: "0xp", Timestamp: traded}); err != nil {
+			return err
+		}
+		usd := big.NewRat(25, 1)
+		if err := tx.InsertSwap(ctx, models.Swap{
+			ChainID: 9000, TxHash: "0xs1", LogIndex: 0, BlockNumber: 177700, BlockHash: "0xs1",
+			Timestamp: traded, PairAddress: pair, Sender: "0xa", Recipient: "0xb",
+			Amount0In: big.NewInt(1), Amount1In: big.NewInt(0),
+			Amount0Out: big.NewInt(0), Amount1Out: big.NewInt(1),
+			AmountUSD: usd,
+		}); err != nil {
+			return err
+		}
+		for _, ts := range []uint64{traded, quiet} {
+			if err := tx.UpsertPairSnapshot(ctx, models.PairSnapshot{
+				PairAddress: pair, BucketSeconds: uint64(bucket), TimestampBucket: models.FloorBucket(ts, uint64(bucket)),
+				Reserve0: mustInt("1000"), Reserve1: mustInt("2000"),
+				Token0PriceUSD: big.NewRat(2, 1), Token1PriceUSD: big.NewRat(1, 1),
+				TVLUSD: big.NewRat(4000, 1),
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	points, err := s.ChartBuckets(ctx, pair, bucket, time.Unix(int64(traded)-3600, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(points) != 2 {
+		t.Fatalf("points = %d, want 2 (a bucket with no swaps must still appear)", len(points))
+	}
+
+	first, second := points[0], points[1]
+	if first.TxCount != 1 || first.VolumeUSD.Cmp(big.NewRat(25, 1)) != 0 {
+		t.Errorf("traded bucket: tx=%d volume=%v, want 1/25", first.TxCount, first.VolumeUSD)
+	}
+	if first.TVLUSD == nil || first.TVLUSD.Cmp(big.NewRat(4000, 1)) != 0 {
+		t.Errorf("traded bucket tvl = %v, want 4000", first.TVLUSD)
+	}
+	if second.TxCount != 0 || second.VolumeUSD.Sign() != 0 {
+		t.Errorf("quiet bucket: tx=%d volume=%v, want 0/0", second.TxCount, second.VolumeUSD)
+	}
+	if second.TVLUSD == nil {
+		t.Error("quiet bucket lost its snapshot in the join")
+	}
+}
+
+// A reorg must not leave a stale close behind. Snapshots carry no block number,
+// so they are dropped by the buckets the orphaned blocks fall in and rebuilt
+// from the replayed events (llm.txt s19).
+func TestRollbackDropsSnapshotsForOrphanedBuckets(t *testing.T) {
+	s := testStore(t)
+	seedPair(t, s)
+	ctx := context.Background()
+
+	const bucket = uint64(models.BucketHour)
+	keep := uint64(1788400800) // an earlier hour, unaffected by the rollback
+	orphan := keep + bucket
+
+	if err := s.InBlockTx(ctx, func(tx *Tx) error {
+		if err := tx.InsertBlock(ctx, models.Block{Number: 177800, Hash: "0xk", ParentHash: "0xp", Timestamp: keep}); err != nil {
+			return err
+		}
+		if err := tx.InsertBlock(ctx, models.Block{Number: 177801, Hash: "0xo", ParentHash: "0xk", Timestamp: orphan}); err != nil {
+			return err
+		}
+		for _, ts := range []uint64{keep, orphan} {
+			if err := tx.UpsertPairSnapshot(ctx, models.PairSnapshot{
+				PairAddress: pair, BucketSeconds: bucket, TimestampBucket: models.FloorBucket(ts, bucket),
+				Reserve0: mustInt("1"), Reserve1: mustInt("2"),
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.InBlockTx(ctx, func(tx *Tx) error { return tx.RollbackFrom(ctx, 177801) }); err != nil {
+		t.Fatal(err)
+	}
+
+	var buckets []int64
+	rows, err := s.pool.Query(ctx, `SELECT timestamp_bucket FROM pair_snapshots ORDER BY timestamp_bucket`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var b int64
+		if err := rows.Scan(&b); err != nil {
+			t.Fatal(err)
+		}
+		buckets = append(buckets, b)
+	}
+	want := int64(models.FloorBucket(keep, bucket))
+	if len(buckets) != 1 || buckets[0] != want {
+		t.Fatalf("snapshots after rollback = %v, want only the pre-fork bucket %d", buckets, want)
 	}
 }

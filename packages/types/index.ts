@@ -115,11 +115,20 @@ export type LiquidityEventRecord = {
 
 export type ChartInterval = '1h' | '1d';
 
+/**
+ * One time bucket of a pair's activity.
+ *
+ * Both token prices are reported because a pair chart has two sides. Each is the
+ * bucket's closing USD price and is null when the token has no route to a
+ * stablecoin — null means "not priceable", never zero.
+ */
 export type ChartPoint = {
   timestamp: number;
-  price: string | null;
+  token0PriceUsd: string | null;
+  token1PriceUsd: string | null;
   tvlUsd: string | null;
   volumeUsd: string;
+  txCount: number;
 };
 
 export type AccountPosition = {

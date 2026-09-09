@@ -140,6 +140,23 @@ const (
 	BucketDay  = 86400
 )
 
+// PairSnapshot is a pair's state at the close of one time bucket.
+//
+// Reserves are the authoritative part: they come from the last Sync event in the
+// bucket and are exact. Prices and TVL are derived, and stay nil for a pool with
+// no route to a stablecoin — an unpriceable bucket is reported as unpriceable
+// rather than assigned a number (llm.txt s26).
+type PairSnapshot struct {
+	PairAddress     string
+	BucketSeconds   uint64
+	TimestampBucket uint64
+	Reserve0        *big.Int
+	Reserve1        *big.Int
+	Token0PriceUSD  *big.Rat
+	Token1PriceUSD  *big.Rat
+	TVLUSD          *big.Rat
+}
+
 // FloorBucket truncates a unix timestamp to the start of its bucket.
 func FloorBucket(ts uint64, bucketSeconds uint64) uint64 {
 	if bucketSeconds == 0 {

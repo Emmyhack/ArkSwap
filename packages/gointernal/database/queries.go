@@ -161,27 +161,53 @@ func (s *Store) LiquidityPage(ctx context.Context, pair string, limit, offset in
 }
 
 // ChartPoint is one time bucket of activity for a pair.
+//
+// Prices and TVL are the bucket's close, taken from the last Sync in it. They
+// stay nil for a pool with no route to a stablecoin, and for buckets indexed
+// before snapshots were recorded — a gap in the series is honest, a
+// back-filled guess is not.
 type ChartPoint struct {
-	Bucket    int64
-	VolumeUSD *big.Rat
-	TxCount   int64
+	Bucket         int64
+	VolumeUSD      *big.Rat
+	TxCount        int64
+	Token0PriceUSD *big.Rat
+	Token1PriceUSD *big.Rat
+	TVLUSD         *big.Rat
 }
 
-// ChartBuckets aggregates swap activity into fixed time buckets.
+// ChartBuckets aggregates a pair's activity into fixed time buckets.
 //
-// Derived from the swaps table rather than a snapshots table: swaps are the
-// durable record, so a chart rebuilt after a database wipe matches the one
-// before it. Reserve/TVL history needs per-block reserve snapshots, which the
-// MVP does not record — the API reports volume here and leaves price/TVL null
-// rather than inventing a series.
+// Volume and transaction counts come from the swaps table, which is the durable
+// record: a chart rebuilt after a database wipe matches the one before it.
+// Prices and TVL come from pair_snapshots, written by the indexer at the close
+// of each bucket from the reserves as they stood then.
+//
+// The join is a full outer join because the two sides do not always coincide: a
+// bucket where liquidity was added but nothing traded has a snapshot and no
+// swaps, and a bucket indexed before snapshots existed has swaps and no
+// snapshot. Either way the bucket appears, with the missing half null.
 func (s *Store) ChartBuckets(ctx context.Context, pair string, bucketSeconds int64, since time.Time) ([]ChartPoint, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT (timestamp / $2) * $2 AS bucket,
-		       sum(amount_usd)::text,
-		       count(*)
-		  FROM swaps
-		 WHERE pair_address = $1 AND timestamp >= $3
-		 GROUP BY bucket
+		WITH vol AS (
+			SELECT (timestamp / $2) * $2 AS bucket,
+			       sum(amount_usd) AS volume_usd,
+			       count(*)        AS tx_count
+			  FROM swaps
+			 WHERE pair_address = $1 AND timestamp >= $3
+			 GROUP BY bucket
+		), snap AS (
+			SELECT timestamp_bucket AS bucket,
+			       token0_price_usd, token1_price_usd, tvl_usd
+			  FROM pair_snapshots
+			 WHERE pair_address = $1 AND bucket_seconds = $2 AND timestamp_bucket >= $3
+		)
+		SELECT COALESCE(v.bucket, s.bucket) AS bucket,
+		       v.volume_usd::text,
+		       COALESCE(v.tx_count, 0),
+		       s.token0_price_usd::text,
+		       s.token1_price_usd::text,
+		       s.tvl_usd::text
+		  FROM vol v FULL OUTER JOIN snap s ON v.bucket = s.bucket
 		 ORDER BY bucket`, pair, bucketSeconds, since.Unix())
 	if err != nil {
 		return nil, fmt.Errorf("database: chart buckets: %w", err)
@@ -191,14 +217,17 @@ func (s *Store) ChartBuckets(ctx context.Context, pair string, bucketSeconds int
 	var out []ChartPoint
 	for rows.Next() {
 		var p ChartPoint
-		var usd *string
-		if err := rows.Scan(&p.Bucket, &usd, &p.TxCount); err != nil {
+		var usd, price0, price1, tvl *string
+		if err := rows.Scan(&p.Bucket, &usd, &p.TxCount, &price0, &price1, &tvl); err != nil {
 			return nil, err
 		}
+		// A bucket with no swaps traded nothing, so zero volume is a fact rather
+		// than a missing value. Prices and TVL stay nil when unknown.
 		p.VolumeUSD = ratFrom(usd)
 		if p.VolumeUSD == nil {
 			p.VolumeUSD = new(big.Rat)
 		}
+		p.Token0PriceUSD, p.Token1PriceUSD, p.TVLUSD = ratFrom(price0), ratFrom(price1), ratFrom(tvl)
 		out = append(out, p)
 	}
 	return out, rows.Err()

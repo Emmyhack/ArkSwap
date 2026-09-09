@@ -745,3 +745,32 @@ button { font-family: inherit; }
   display: flex; justify-content: space-between; gap: 18px; flex-wrap: wrap;
   color: var(--faint); font-size: 13.5px;
 }
+
+/* --- Recent trades ------------------------------------------------------- */
+.trades { overflow: hidden; }
+.trades__row {
+  display: grid;
+  grid-template-columns: 1.1fr 1.6fr 0.7fr 0.6fr;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 18px;
+  font-size: 14px;
+  border-top: 1px solid var(--line);
+  color: var(--text);
+}
+.trades__row:first-child { border-top: 0; }
+.trades__row--link { text-decoration: none; transition: background 0.15s ease; }
+.trades__row--link:hover { background: var(--surface-2); text-decoration: none; }
+.trades__pair { font-weight: 600; letter-spacing: -0.01em; }
+.trades__amounts { color: var(--muted); font-variant-numeric: tabular-nums; }
+.trades__arrow { color: var(--faint); margin: 0 2px; }
+.trades__usd { text-align: right; font-variant-numeric: tabular-nums; color: var(--accent-hi); }
+.trades__age { text-align: right; color: var(--faint); font-size: 13px; }
+.trades__muted { color: var(--faint); }
+.trades__empty { padding: 22px 18px; color: var(--muted); font-size: 14px; }
+
+@media (max-width: 720px) {
+  .trades__row { grid-template-columns: 1fr auto; row-gap: 4px; }
+  .trades__amounts { grid-column: 1; }
+  .trades__age { grid-column: 2; }
+}

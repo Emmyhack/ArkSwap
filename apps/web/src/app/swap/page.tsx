@@ -4,6 +4,7 @@ import {Footer} from '@/components/Footer';
 import {SwapCard} from '@/components/SwapCard';
 import {ConnectSection} from '@/components/landing/ConnectSection';
 import {FeatureGrid} from '@/components/landing/FeatureGrid';
+import {RecentTrades} from '@/components/landing/RecentTrades';
 import {StatsSection} from '@/components/landing/StatsSection';
 
 export default function SwapPage() {
@@ -38,6 +39,7 @@ export default function SwapPage() {
       <div className="shell">
         <FeatureGrid />
         <StatsSection />
+        <RecentTrades />
         <ConnectSection />
         <Footer />
       </div>

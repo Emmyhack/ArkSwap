@@ -89,6 +89,9 @@ export type SwapRecord = {
   recipient: string;
   tokenIn: string | null;
   tokenOut: string | null;
+  /** Resolved on the server when the token's metadata call succeeded (llm.txt s13). */
+  tokenInSymbol: string | null;
+  tokenOutSymbol: string | null;
   amountIn: string | null;
   amountOut: string | null;
   amountUsd: string | null;

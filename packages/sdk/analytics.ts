@@ -60,7 +60,14 @@ export class AnalyticsClient {
   constructor(opts: AnalyticsClientOptions = {}) {
     this.baseUrl = opts.baseUrl?.replace(/\/$/, '');
     this.timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-    this.fetchImpl = opts.fetchImpl ?? globalThis.fetch;
+    // Bound to the global, not stored bare: browsers require `fetch` to be called
+    // with `window` as its receiver, and calling `this.fetchImpl(...)` on a bare
+    // reference makes the instance the receiver — which throws "Illegal
+    // invocation" before any request leaves. The throw lands in the catch below
+    // and looks exactly like an unreachable backend, so it is worth being
+    // explicit here.
+    const globalFetch = globalThis.fetch;
+    this.fetchImpl = opts.fetchImpl ?? ((...args) => globalFetch.apply(globalThis, args));
   }
 
   get configured(): boolean {

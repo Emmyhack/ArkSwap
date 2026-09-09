@@ -5,7 +5,9 @@
   "description": "ArkSwap client helpers: AMM math and the analytics API client",
   "main": "index.ts",
   "types": "index.ts",
-  "exports": {".": "./index.ts"},
+  "exports": {
+    ".": "./index.ts"
+  },
   "dependencies": {
     "@arkswap/abis": "workspace:*",
     "@arkswap/addresses": "workspace:*",
@@ -14,5 +16,8 @@
   },
   "peerDependencies": {
     "viem": "^2.21.0"
+  },
+  "scripts": {
+    "test": "node --test --experimental-strip-types *.test.ts"
   }
 }

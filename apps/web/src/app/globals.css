@@ -475,47 +475,131 @@ button { font-family: inherit; }
   box-shadow: var(--shadow-card);
   overflow: hidden;
 }
+/* The token picker is a column: head, search and chips hold their height, the
+   list takes the slack and scrolls inside the card. */
+.modal__body--token {
+  max-width: 460px;
+  display: flex;
+  flex-direction: column;
+  max-height: min(672px, calc(100dvh - 32px));
+  padding-bottom: 8px;
+}
 .modal__head { display: flex; align-items: center; justify-content: space-between; padding: 20px 20px 14px; }
 .modal__head h2 { margin: 0; font-size: 17px; font-weight: 600; }
 .modal__close {
   width: 30px; height: 30px; border-radius: 50%;
-  background: var(--surface-2); border: none; color: var(--muted); cursor: pointer; font-size: 15px;
+  background: none; border: none; color: var(--muted); cursor: pointer;
+  display: grid; place-items: center;
+  transition: color 0.15s, background 0.15s;
 }
-.modal__close:hover { color: var(--text); }
-.modal__search { padding: 0 20px 14px; }
+.modal__close:hover { color: var(--text); background: var(--surface-2); }
+
+.modal__search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin: 0 20px 14px;
+}
+.modal__search-icon {
+  position: absolute;
+  left: 17px;
+  width: 19px;
+  height: 19px;
+  color: var(--faint);
+  pointer-events: none;
+}
 .modal__search input {
   width: 100%;
-  padding: 13px 16px;
-  border-radius: var(--r-pill);
+  padding: 14px 18px 14px 46px;
+  border-radius: 20px;
   background: var(--surface-2);
   border: 1px solid var(--border);
   color: var(--text);
   font-size: 15px;
   outline: none;
 }
-.modal__search input:focus { border-color: var(--accent); }
-.modal__note { padding: 12px 20px 18px; color: var(--faint); font-size: 12.5px; line-height: 1.55; }
+.modal__search input::placeholder { color: var(--faint); }
+.modal__search input:focus { border-color: var(--border-strong); }
 
-.token-list { list-style: none; margin: 0; padding: 0 8px; max-height: 340px; overflow-y: auto; }
+/* Common tokens, one tap away. Hidden while searching so results own the panel. */
+.token-quick {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 8px;
+  padding: 0 20px 18px;
+}
+.token-quick__chip {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 6px;
+  border-radius: 18px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.token-quick__chip > span:last-child {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.token-quick__chip:hover:not(:disabled) { background: var(--surface-3); border-color: var(--border-strong); }
+.token-quick__chip:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.token-list__label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 20px 10px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.token-list { list-style: none; margin: 0; padding: 0; flex: 1; min-height: 0; overflow-y: auto; }
 .token-list button {
   width: 100%;
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px;
+  padding: 9px 20px;
   background: none;
   border: none;
-  border-radius: 14px;
   color: var(--text);
   cursor: pointer;
   text-align: left;
   font-size: 15px;
+  transition: background 0.12s;
 }
 .token-list button:hover:not(:disabled) { background: var(--surface-2); }
 .token-list button:disabled { opacity: 0.35; cursor: not-allowed; }
-.token-list__name { font-weight: 600; display: flex; align-items: center; gap: 8px; }
-.token-list__meta { display: block; color: var(--faint); font-size: 12.5px; margin-top: 2px; }
-.token-list__empty { padding: 28px 12px; text-align: center; color: var(--faint); font-size: 14px; }
+.token-list__text { flex: 1; min-width: 0; }
+.token-list__name {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.token-list__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 1px;
+  color: var(--faint);
+  font-size: 14px;
+}
+.token-list__addr { font-variant-numeric: tabular-nums; }
+.token-list__empty { padding: 24px 20px 32px; color: var(--faint); font-size: 14px; line-height: 1.55; }
+.token-list__empty p { margin: 0; }
+.token-list__empty p + p { margin-top: 6px; font-size: 12.5px; }
 
 /* ----------------------------------------------------------------- misc --- */
 .muted { color: var(--muted); }

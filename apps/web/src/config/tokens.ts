@@ -39,6 +39,14 @@ export const MUSDT = bySymbol('mUSDT');
  */
 export const TOKEN_LIST: Token[] = REGISTRY.filter((t) => t.isNative || Boolean(t.address));
 
+/**
+ * The one-tap chips above the list. Registry order already leads with what a
+ * user reaches for first — native KASH, WKASH, then the manifest's own order —
+ * so this is a slice of the same allowlist rather than a second list that could
+ * drift away from it.
+ */
+export const COMMON_TOKENS: Token[] = TOKEN_LIST.slice(0, 5);
+
 export function tokenKey(token: Token): string {
   return token.isNative ? 'NATIVE' : (token.address as string).toLowerCase();
 }

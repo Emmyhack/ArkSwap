@@ -5,14 +5,14 @@ import {useAccount} from 'wagmi';
 
 import {explorerTxUrl} from '@/config/chain';
 import {shortenAddress} from '@/lib/format';
-import {type ActivityItem, useActivity} from '@/state/activity';
+import {type ActivityItem, isStale, useActivity} from '@/state/activity';
 
 /**
  * Recent transactions from this browser, with pending ones surfaced in the nav.
  */
 export function ActivityMenu({inline}: {inline?: boolean}) {
   const {isConnected} = useAccount();
-  const {items, pendingCount, clear} = useActivity();
+  const {items, pendingCount, dismiss, clear} = useActivity();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -38,9 +38,15 @@ export function ActivityMenu({inline}: {inline?: boolean}) {
     <div className="activity__list">
       {items.length === 0 && <div className="activity__empty">No transactions from this browser yet.</div>}
       {items.slice(0, 20).map((item) => (
-        <ActivityRow key={item.hash} item={item} />
+        <ActivityRow key={item.hash} item={item} onDismiss={() => dismiss(item.hash)} />
       ))}
-      {items.some((i) => i.status !== 'pending') && (
+      {items.some((i) => i.status === 'pending' && !isStale(i)) && (
+        <div className="activity__note">
+          A pending transaction can only be sped up or cancelled from your wallet, by replacing it with the same
+          nonce. Dismissing here just hides the entry.
+        </div>
+      )}
+      {items.some((i) => i.status !== 'pending' || isStale(i)) && (
         <button type="button" className="activity__clear" onClick={clear}>
           Clear history
         </button>
@@ -88,27 +94,41 @@ export function ActivityMenu({inline}: {inline?: boolean}) {
   );
 }
 
-function ActivityRow({item}: {item: ActivityItem}) {
+function ActivityRow({item, onDismiss}: {item: ActivityItem; onDismiss: () => void}) {
   const url = explorerTxUrl(item.hash);
+  const stale = isStale(item);
+  const status = stale
+    ? 'Not found on chain'
+    : item.status === 'pending'
+      ? 'Pending'
+      : item.status === 'confirmed'
+        ? 'Confirmed'
+        : 'Failed';
   const body = (
     <>
-      <span className={`activity__dot activity__dot--${item.status}`} aria-hidden />
+      <span className={`activity__dot activity__dot--${stale ? 'failed' : item.status}`} aria-hidden />
       <span className="activity__text">
         <span className="activity__summary">{item.summary}</span>
         <span className="activity__meta">
-          {item.status === 'pending' ? 'Pending' : item.status === 'confirmed' ? 'Confirmed' : 'Failed'} ·{' '}
-          <span className="mono">{shortenAddress(item.hash)}</span>
+          {status} · <span className="mono">{shortenAddress(item.hash)}</span>
         </span>
       </span>
       {url && <span className="activity__ext">↗</span>}
     </>
   );
-  return url ? (
-    <a className="activity__row" href={url} target="_blank" rel="noreferrer">
-      {body}
-    </a>
-  ) : (
-    <div className="activity__row">{body}</div>
+  return (
+    <div className="activity__item">
+      {url ? (
+        <a className="activity__row" href={url} target="_blank" rel="noreferrer">
+          {body}
+        </a>
+      ) : (
+        <div className="activity__row">{body}</div>
+      )}
+      <button type="button" className="icon-btn icon-btn--sm" aria-label="Dismiss" title="Dismiss" onClick={onDismiss}>
+        ×
+      </button>
+    </div>
   );
 }
 

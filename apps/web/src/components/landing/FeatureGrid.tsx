@@ -10,7 +10,7 @@ export function FeatureGrid() {
       <h2 className="section__title">Go direct to Ark.</h2>
 
       <div className="grid-2">
-        <div className="feature" style={{'--tint': 'rgba(255,255,255,0.08)', '--pill': '#f0f0f0'} as React.CSSProperties}>
+        <div className="feature">
           <Link href="/swap" className="feature__pill">
             ◆ Swap
           </Link>
@@ -22,7 +22,7 @@ export function FeatureGrid() {
           </div>
         </div>
 
-        <div className="feature" style={{'--tint': 'rgba(255,255,255,0.08)', '--pill': '#f0f0f0'} as React.CSSProperties}>
+        <div className="feature">
           <Link href="/pool" className="feature__pill">
             ▲ Liquidity
           </Link>
@@ -51,7 +51,7 @@ export function FeatureGrid() {
           </div>
         </div>
 
-        <div className="feature" style={{'--tint': 'rgba(255,255,255,0.08)', '--pill': '#f0f0f0'} as React.CSSProperties}>
+        <div className="feature">
           <a className="feature__pill" href={`${REPO}#readme`} target="_blank" rel="noreferrer">
             ⟨⟩ Developer docs
           </a>
@@ -76,7 +76,7 @@ export function FeatureGrid() {
           </div>
         </div>
 
-        <div className="feature" style={{'--tint': 'rgba(255,255,255,0.08)', '--pill': '#f0f0f0'} as React.CSSProperties}>
+        <div className="feature">
           <a className="feature__pill" href={`${REPO}/blob/main/docs/SECURITY-REVIEW.md`} target="_blank" rel="noreferrer">
             ✦ Non-custodial
           </a>

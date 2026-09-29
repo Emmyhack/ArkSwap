@@ -35,8 +35,20 @@ type ActivityState = {
   items: ActivityItem[];
   pendingCount: number;
   track: (item: {hash: Hex; kind: ActivityKind; summary: string}) => void;
+  /** Drops one entry from the list. Does not and cannot touch the chain. */
+  dismiss: (hash: Hex) => void;
   clear: () => void;
 };
+
+/**
+ * A hash still unconfirmed after this long was almost certainly dropped or
+ * replaced from the wallet; it is shown as such and no longer polled.
+ */
+export const STALE_AFTER_MS = 3 * 60 * 60 * 1000;
+
+export function isStale(item: ActivityItem): boolean {
+  return item.status === 'pending' && Date.now() - item.createdAt > STALE_AFTER_MS;
+}
 
 const KEY = `arkswap.activity.${ARK_CHAIN_ID}`;
 const MAX_ITEMS = 60;
@@ -74,8 +86,12 @@ export function ActivityProvider({children}: {children: React.ReactNode}) {
     setAll((prev) => prev.map((p) => (p.hash.toLowerCase() === hash.toLowerCase() ? {...p, status} : p)));
   }, []);
 
+  const dismiss = useCallback((hash: Hex) => {
+    setAll((prev) => prev.filter((p) => p.hash.toLowerCase() !== hash.toLowerCase()));
+  }, []);
+
   const clear = useCallback(() => {
-    setAll((prev) => prev.filter((p) => p.status === 'pending'));
+    setAll((prev) => prev.filter((p) => p.status === 'pending' && !isStale(p)));
   }, []);
 
   const items = useMemo(
@@ -83,11 +99,11 @@ export function ActivityProvider({children}: {children: React.ReactNode}) {
     [all, address],
   );
 
-  const pending = useMemo(() => all.filter((i) => i.status === 'pending'), [all]);
+  const pending = useMemo(() => all.filter((i) => i.status === 'pending' && !isStale(i)), [all]);
 
   const value = useMemo<ActivityState>(
-    () => ({items, pendingCount: items.filter((i) => i.status === 'pending').length, track, clear}),
-    [items, track, clear],
+    () => ({items, pendingCount: items.filter((i) => i.status === 'pending' && !isStale(i)).length, track, dismiss, clear}),
+    [items, track, dismiss, clear],
   );
 
   return (

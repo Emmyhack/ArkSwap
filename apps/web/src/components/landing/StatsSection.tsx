@@ -8,6 +8,8 @@ import {useProtocolAnalytics} from '@/hooks/useAnalytics';
 import {useProtocolStats} from '@/hooks/useProtocolStats';
 import {formatAmount} from '@/lib/format';
 
+import {Skeleton} from '../Skeleton';
+
 /**
  * Protocol figures.
  *
@@ -70,7 +72,7 @@ export function StatsSection() {
               Total value locked
             </span>
             <span className="stat__value stat__value--accent">
-              {stats ? `$${formatUsdCompact(stats.tvlUsd)}` : isLoading ? '…' : '—'}
+              {stats ? `$${formatUsdCompact(stats.tvlUsd)}` : isLoading ? <Skeleton width={110} height={30} /> : '—'}
               {!stats && !isLoading && <span className="stat__unit">indexer offline</span>}
             </span>
           </div>
@@ -78,7 +80,7 @@ export function StatsSection() {
           <div className="stat">
             <span className="stat__label">Volume (7d)</span>
             <span className="stat__value">
-              {stats ? `$${formatUsdCompact(stats.volume7dUsd)}` : isLoading ? '…' : '—'}
+              {stats ? `$${formatUsdCompact(stats.volume7dUsd)}` : isLoading ? <Skeleton width={110} height={30} /> : '—'}
               {stats && <span className="stat__unit">{stats.transactions24h} tx / 24h</span>}
             </span>
           </div>

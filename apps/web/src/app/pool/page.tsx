@@ -1,30 +1,38 @@
+import {Suspense} from 'react';
+
 import {ConfigGate} from '@/components/ConfigGate';
 import {DevnetBanner} from '@/components/DevnetBanner';
 import {Footer} from '@/components/Footer';
 import {LiquidityCard} from '@/components/LiquidityCard';
 import {PoolChart} from '@/components/PoolChart';
+import {PoolUrlSync} from '@/components/PoolUrlSync';
+import {PositionsCard} from '@/components/PositionsCard';
 
 export default function PoolPage() {
   return (
     <>
       <main className="hero">
-      <h1 className="hero__title">
-        Provide liquidity,
-        <br />
-        <em>earn the fee.</em>
-      </h1>
+        <h1 className="hero__title">
+          Provide liquidity,
+          <br />
+          <em>earn the fee.</em>
+        </h1>
 
-      <DevnetBanner />
+        <DevnetBanner />
 
-      <ConfigGate>
-        <LiquidityCard />
-        <PoolChart />
-      </ConfigGate>
+        <ConfigGate>
+          <Suspense fallback={null}>
+            <PoolUrlSync />
+          </Suspense>
+          <LiquidityCard />
+          <PositionsCard />
+          <PoolChart />
+        </ConfigGate>
 
-      <p className="hero__sub">
-        Liquidity providers earn the full 0.30% trade fee, split pro rata by pool share. The protocol
-        fee is disabled.
-      </p>
+        <p className="hero__sub">
+          Liquidity providers earn the full 0.30% trade fee, split pro rata by pool share. The protocol
+          fee is disabled.
+        </p>
       </main>
 
       <div className="shell">

@@ -7,12 +7,15 @@ import {useEffect, useState} from 'react';
 import type {Token} from '@/config/tokens';
 import {useSwapTokens} from '@/state/swap';
 
+import {ActivityMenu} from './ActivityMenu';
 import {ConnectButton} from './ConnectButton';
+import {ThemeToggle} from './ThemeToggle';
 import {TokenSelectModal} from './TokenSelectModal';
 
 const LINKS = [
   {href: '/swap', label: 'Trade'},
   {href: '/pool', label: 'Pool'},
+  {href: '/pools', label: 'Explore'},
 ];
 
 export function Nav() {
@@ -20,6 +23,7 @@ export function Nav() {
   const router = useRouter();
   const {setTokenOut, tokenIn} = useSwapTokens();
   const [searchOpen, setSearchOpen] = useState(false);
+  const [drawer, setDrawer] = useState(false);
 
   // "/" focuses search, matching the shortcut the reference layout advertises.
   useEffect(() => {
@@ -30,11 +34,19 @@ export function Nav() {
         e.preventDefault();
         setSearchOpen(true);
       }
-      if (e.key === 'Escape') setSearchOpen(false);
+      if (e.key === 'Escape') {
+        setSearchOpen(false);
+        setDrawer(false);
+      }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+
+  // Route changes close the drawer.
+  useEffect(() => {
+    setDrawer(false);
+  }, [pathname]);
 
   function pick(token: Token) {
     setTokenOut(token);
@@ -56,12 +68,7 @@ export function Nav() {
 
         <div className="nav__links">
           {LINKS.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="nav__link"
-              data-active={pathname?.startsWith(link.href) ?? false}
-            >
+            <Link key={link.href} href={link.href} className="nav__link" data-active={pathname === link.href}>
               {link.label}
             </Link>
           ))}
@@ -80,8 +87,46 @@ export function Nav() {
 
         <div className="nav__spacer" />
 
+        <div className="nav__tools">
+          <ThemeToggle />
+          <ActivityMenu />
+        </div>
         <ConnectButton />
+
+        <button
+          className="nav__burger"
+          type="button"
+          aria-label={drawer ? 'Close menu' : 'Open menu'}
+          aria-expanded={drawer}
+          onClick={() => setDrawer((v) => !v)}
+        >
+          <span aria-hidden>{drawer ? '×' : '☰'}</span>
+        </button>
       </nav>
+
+      {drawer && (
+        <div className="drawer" role="dialog" aria-label="Menu">
+          <div className="drawer__links">
+            {LINKS.map((link) => (
+              <Link key={link.href} href={link.href} className="nav__link" data-active={pathname === link.href}>
+                {link.label}
+              </Link>
+            ))}
+            <button
+              className="nav__link nav__link--btn"
+              type="button"
+              onClick={() => {
+                setDrawer(false);
+                setSearchOpen(true);
+              }}
+            >
+              Search tokens
+            </button>
+            <ThemeToggle label />
+          </div>
+          <ActivityMenu inline />
+        </div>
+      )}
 
       {searchOpen && (
         <TokenSelectModal

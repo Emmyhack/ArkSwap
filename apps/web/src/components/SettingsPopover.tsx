@@ -2,25 +2,21 @@
 
 import {useEffect, useRef, useState} from 'react';
 
+import {useSettings} from '@/state/settings';
+
 import {SlippageControl} from './SlippageControl';
 
 /**
- * Slippage and deadline, tucked behind a gear the way the familiar swap UX does.
+ * Slippage, deadline and the fee-on-transfer switch, tucked behind a gear the
+ * way the familiar swap UX does.
  *
  * They stay one click away rather than buried: `amountOutMin` is the user's only
  * on-chain protection, so it must remain visible and adjustable (llm.txt s43).
+ * Settings are shared by every form and persist in this browser.
  */
-export function SettingsPopover({
-  slippageBps,
-  onSlippageChange,
-  deadlineMinutes,
-  onDeadlineChange,
-}: {
-  slippageBps: bigint;
-  onSlippageChange: (bps: bigint) => void;
-  deadlineMinutes: number;
-  onDeadlineChange: (minutes: number) => void;
-}) {
+export function SettingsPopover({extra}: {extra?: React.ReactNode}) {
+  const {slippageBps, deadlineMinutes, feeOnTransfer, setSlippageBps, setDeadlineMinutes, setFeeOnTransfer, reset, isDefault} =
+    useSettings();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -40,15 +36,14 @@ export function SettingsPopover({
     };
   }, [open]);
 
-  // Surface a non-default tolerance on the gear itself, so a risky setting is
-  // never hidden behind a closed menu.
-  const isDefault = slippageBps === 50n && deadlineMinutes === 20;
-
   return (
     <div className="card__tools" ref={ref}>
+      {extra}
+      {/* Surface a non-default tolerance on the gear itself, so a risky setting
+          is never hidden behind a closed menu. */}
       {!isDefault && (
         <span className="settings__label" style={{alignSelf: 'center', marginRight: 8}}>
-          {Number(slippageBps) / 100}% slippage
+          {Number(slippageBps) / 100}% slippage{feeOnTransfer && ' · fee-on-transfer'}
         </span>
       )}
       <button
@@ -75,11 +70,30 @@ export function SettingsPopover({
             <span className="popover__label">Slippage tolerance &amp; deadline</span>
             <SlippageControl
               slippageBps={slippageBps}
-              onChange={onSlippageChange}
+              onChange={setSlippageBps}
               deadlineMinutes={deadlineMinutes}
-              onDeadlineChange={onDeadlineChange}
+              onDeadlineChange={setDeadlineMinutes}
             />
           </div>
+          <div className="popover__row">
+            <label className="toggle">
+              <input type="checkbox" checked={feeOnTransfer} onChange={(e) => setFeeOnTransfer(e.target.checked)} />
+              <span className="toggle__track" aria-hidden />
+              <span>
+                <span className="toggle__title">Fee-on-transfer tokens</span>
+                <span className="toggle__hint">
+                  Use the router&apos;s transfer-tax-tolerant calls. Exact-output swaps are unavailable while on.
+                </span>
+              </span>
+            </label>
+          </div>
+          {!isDefault && (
+            <div className="popover__row" style={{paddingTop: 6}}>
+              <button type="button" className="settings__chip" onClick={reset}>
+                Reset to defaults
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -1,7 +1,10 @@
+import {Suspense} from 'react';
+
 import {ConfigGate} from '@/components/ConfigGate';
 import {DevnetBanner} from '@/components/DevnetBanner';
 import {Footer} from '@/components/Footer';
 import {SwapCard} from '@/components/SwapCard';
+import {SwapUrlSync} from '@/components/SwapUrlSync';
 import {ConnectSection} from '@/components/landing/ConnectSection';
 import {FeatureGrid} from '@/components/landing/FeatureGrid';
 import {RecentTrades} from '@/components/landing/RecentTrades';
@@ -20,6 +23,9 @@ export default function SwapPage() {
         <DevnetBanner />
 
         <ConfigGate>
+          <Suspense fallback={null}>
+            <SwapUrlSync />
+          </Suspense>
           <SwapCard />
         </ConfigGate>
 

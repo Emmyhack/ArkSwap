@@ -6,6 +6,8 @@ import {useAccount, useReadContract, useWaitForTransactionReceipt, useWriteContr
 import {erc20Abi} from '@/config/abis';
 import {ARKSWAP_ROUTER_ADDRESS} from '@/config/contracts';
 import type {Token} from '@/config/tokens';
+import {formatAmount} from '@/lib/format';
+import {useActivity} from '@/state/activity';
 
 /**
  * ERC-20 approval flow for the router (llm.txt s44).
@@ -16,6 +18,7 @@ import type {Token} from '@/config/tokens';
  */
 export function useAllowance(token: Token | undefined, amount: bigint | undefined) {
   const {address} = useAccount();
+  const {track} = useActivity();
   const needsErc20 = Boolean(token && !token.isNative && token.address && ARKSWAP_ROUTER_ADDRESS);
 
   const allowance = useReadContract({
@@ -26,7 +29,7 @@ export function useAllowance(token: Token | undefined, amount: bigint | undefine
     query: {enabled: Boolean(needsErc20 && address), refetchInterval: 12_000},
   });
 
-  const {writeContract, data: hash, isPending, reset} = useWriteContract();
+  const {writeContract, data: hash, isPending, error, reset} = useWriteContract();
   const receipt = useWaitForTransactionReceipt({hash});
 
   const current = (allowance.data as bigint | undefined) ?? 0n;
@@ -34,20 +37,35 @@ export function useAllowance(token: Token | undefined, amount: bigint | undefine
 
   function approve(exact = true) {
     if (!token?.address || !ARKSWAP_ROUTER_ADDRESS || amount === undefined) return;
-    writeContract({
-      address: token.address,
-      abi: erc20Abi,
-      functionName: 'approve',
-      args: [ARKSWAP_ROUTER_ADDRESS, exact ? amount : maxUint256],
-    });
+    const value = exact ? amount : maxUint256;
+    writeContract(
+      {
+        address: token.address,
+        abi: erc20Abi,
+        functionName: 'approve',
+        args: [ARKSWAP_ROUTER_ADDRESS, value],
+      },
+      {
+        onSuccess: (txHash) =>
+          track({
+            hash: txHash,
+            kind: 'approve',
+            summary: exact
+              ? `Approve ${formatAmount(amount, token.decimals, 4)} ${token.symbol}`
+              : `Approve unlimited ${token.symbol}`,
+          }),
+      },
+    );
   }
 
   return {
     allowance: current,
+    allowanceLoaded: !needsErc20 || allowance.isFetched,
     needsApproval,
     approve,
     isApproving: isPending || receipt.isLoading,
     approvalConfirmed: receipt.isSuccess,
+    approvalError: error,
     refetchAllowance: allowance.refetch,
     reset,
   };

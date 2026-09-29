@@ -1,10 +1,16 @@
 'use client';
 
 import {useEffect, useMemo, useState} from 'react';
+import {isAddress} from 'viem';
 
-import {COMMON_TOKENS, TOKEN_LIST, type Token, sameToken, tokenKey} from '@/config/tokens';
+import {explorerAddressUrl} from '@/config/chain';
+import {COMMON_TOKENS, type Token, sameToken, tokenKey} from '@/config/tokens';
+import {useTokenMetadata} from '@/hooks/useTokenMetadata';
 import {shortenAddress} from '@/lib/format';
+import {IMPORTED_WARNING, useTokens} from '@/state/tokens';
 
+import {AddToWallet} from './AddToWallet';
+import {Skeleton} from './Skeleton';
 import {TokenIcon} from './TokenIcon';
 
 /**
@@ -16,6 +22,10 @@ import {TokenIcon} from './TokenIcon';
  * is the main defence against look-alike symbols (llm.txt s48). Devnet fixtures
  * carry their nature in the name the manifest gives them — "Mock USD Coin (Ark
  * Devnet)" — and the amount field still badges them once selected (s15).
+ *
+ * Pasting an address that is not listed offers to import it. The import reads
+ * name, symbol and decimals from the contract and nothing more; the token is
+ * badged "unverified" everywhere and can be removed from this list again.
  */
 export function TokenSelectModal({
   exclude,
@@ -29,6 +39,7 @@ export function TokenSelectModal({
   title?: string;
 }) {
   const [query, setQuery] = useState('');
+  const {tokens, importToken, removeToken} = useTokens();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -40,16 +51,18 @@ export function TokenSelectModal({
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return TOKEN_LIST;
-    return TOKEN_LIST.filter(
+    if (!q) return tokens;
+    return tokens.filter(
       (t) =>
         t.symbol.toLowerCase().includes(q) ||
         t.name.toLowerCase().includes(q) ||
         (t.address ?? '').toLowerCase().includes(q),
     );
-  }, [query]);
+  }, [query, tokens]);
 
   const searching = query.trim().length > 0;
+  const pastedAddress = isAddress(query.trim()) && results.length === 0;
+  const candidate = useTokenMetadata(pastedAddress ? query.trim() : '');
 
   return (
     <div className="modal" onClick={onClose} role="presentation">
@@ -73,7 +86,7 @@ export function TokenSelectModal({
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search tokens"
+            placeholder="Search name, symbol or paste an address"
             aria-label="Search name, symbol or address"
           />
         </div>
@@ -98,10 +111,69 @@ export function TokenSelectModal({
           </div>
         )}
 
-        {results.length === 0 ? (
+        {pastedAddress ? (
+          <div className="import">
+            {candidate.isLoading && (
+              <div className="import__card">
+                <Skeleton width={36} height={36} style={{borderRadius: 18}} />
+                <span className="token-list__text">
+                  <Skeleton width={140} height={16} />
+                  <br />
+                  <Skeleton width={90} height={12} style={{marginTop: 6}} />
+                </span>
+              </div>
+            )}
+            {candidate.notAToken && (
+              <div className="token-list__empty">
+                <p>Nothing at {shortenAddress(query.trim())} answers like an ERC-20.</p>
+                <p>Check the address on the explorer before trying again.</p>
+              </div>
+            )}
+            {candidate.metadata && (
+              <>
+                <div className="import__card">
+                  <TokenIcon
+                    token={{address: candidate.metadata.address, symbol: candidate.metadata.symbol, name: candidate.metadata.name, decimals: candidate.metadata.decimals}}
+                    size={36}
+                  />
+                  <span className="token-list__text">
+                    <span className="token-list__name">{candidate.metadata.name}</span>
+                    <span className="token-list__meta">
+                      <span>{candidate.metadata.symbol}</span>
+                      <span className="token-list__addr">{shortenAddress(candidate.metadata.address)}</span>
+                      <span>{candidate.metadata.decimals} decimals</span>
+                    </span>
+                  </span>
+                  {explorerAddressUrl(candidate.metadata.address) && (
+                    <a href={explorerAddressUrl(candidate.metadata.address)} target="_blank" rel="noreferrer">
+                      Explorer ↗
+                    </a>
+                  )}
+                </div>
+                <div className="alert alert--warn" style={{margin: '10px 20px 0'}}>
+                  This token is not on ArkSwap&apos;s reviewed list. Anyone can deploy a token with any name or
+                  symbol; confirm the address against a source you trust before trading it.
+                </div>
+                <div style={{padding: '12px 20px 4px'}}>
+                  <button
+                    type="button"
+                    className="btn btn--primary btn--sm"
+                    style={{marginTop: 0}}
+                    onClick={() => {
+                      const token = importToken(candidate.metadata!);
+                      onSelect(token);
+                    }}
+                  >
+                    Import {candidate.metadata.symbol}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        ) : results.length === 0 ? (
           <div className="token-list__empty">
             <p>No token matches “{query}”.</p>
-            <p>ArkSwap only lists reviewed tokens; arbitrary addresses are not accepted here.</p>
+            <p>Paste a contract address to import a token that is not on the reviewed list.</p>
           </div>
         ) : (
           <>
@@ -113,11 +185,14 @@ export function TokenSelectModal({
               {results.map((token) => {
                 const disabled = exclude ? sameToken(token, exclude) : false;
                 return (
-                  <li key={tokenKey(token)}>
+                  <li key={tokenKey(token)} className="token-list__item">
                     <button type="button" disabled={disabled} onClick={() => onSelect(token)}>
                       <TokenIcon token={token} size={36} />
                       <span className="token-list__text">
-                        <span className="token-list__name">{token.name}</span>
+                        <span className="token-list__name">
+                          {token.name}
+                          {token.isImported && <span className="badge badge--warn" style={{marginLeft: 8}}>unverified</span>}
+                        </span>
                         <span className="token-list__meta">
                           <span>{token.symbol}</span>
                           {token.address && (
@@ -126,10 +201,27 @@ export function TokenSelectModal({
                         </span>
                       </span>
                     </button>
+                    <span className="token-list__actions">
+                      <AddToWallet token={token} compact />
+                      {token.isImported && token.address && (
+                        <button
+                          type="button"
+                          className="icon-btn icon-btn--sm"
+                          title={`Remove ${token.symbol} from your list`}
+                          aria-label={`Remove ${token.symbol} from your list`}
+                          onClick={() => removeToken(token.address!)}
+                        >
+                          <CloseIcon size={13} />
+                        </button>
+                      )}
+                    </span>
                   </li>
                 );
               })}
             </ul>
+            {results.some((t) => t.isImported) && (
+              <div className="token-list__note">{IMPORTED_WARNING}</div>
+            )}
           </>
         )}
       </div>
@@ -146,9 +238,9 @@ function SearchIcon() {
   );
 }
 
-function CloseIcon() {
+function CloseIcon({size = 18}: {size?: number}) {
   return (
-    <svg viewBox="0 0 20 20" width="18" height="18" fill="none" aria-hidden="true">
+    <svg viewBox="0 0 20 20" width={size} height={size} fill="none" aria-hidden="true">
       <path
         d="M5 5L15 15M15 5L5 15"
         stroke="currentColor"

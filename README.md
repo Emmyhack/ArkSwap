@@ -203,10 +203,28 @@ cp apps/web/.env.example apps/web/.env.local   # fill from packages/addresses/ar
 pnpm web:dev                                   # :3000
 ```
 
-Next.js + TypeScript + wagmi + viem, with `/swap` and `/pool` routes. There are
-**no hardcoded addresses**: with configuration missing the app renders a blocking
-"Configuration required" screen naming each absent variable, rather than
-presenting a swap form that could send funds nowhere.
+Next.js + TypeScript + wagmi + viem, with `/swap`, `/pool` and `/pools` routes.
+There are **no hardcoded addresses**: with configuration missing the app renders
+a blocking "Configuration required" screen naming each absent variable, rather
+than presenting a swap form that could send funds nowhere.
+
+What the app does, all against the deployed contracts as they are:
+
+- **Swaps** in both directions of intent: type what you sell (exact input) or
+  what you want to receive (exact output, `amountInMax` bounded). Routes are
+  searched direct, one hop and two hops through the manifest's routing hubs.
+- **Fee-on-transfer tokens** via the router's `SupportingFeeOnTransferTokens`
+  calls, behind a setting that is off by default.
+- **Permit-based liquidity removal**: one EIP-2612 signature carried inside
+  `removeLiquidityWithPermit`, with an approve-then-remove fallback for wallets
+  that cannot sign typed data.
+- **Positions and pools** read from the factory and pairs: every LP position the
+  wallet holds, and an explorer of every pool with a mid-price TVL. Volume and
+  fee columns come from the analytics API when it is reachable.
+- **Token import by address** (badged unverified), **transaction activity** kept
+  per wallet in the browser, **shareable URLs** for swaps and pools, add-to-wallet,
+  a devnet faucet for the mock tokens, WalletConnect when a project id is set,
+  and dark or light metallic themes.
 
 Quotes are computed locally from pool reserves for display, but execution is
 always bounded on-chain by `amountOutMin` / `amountInMax`. `amountOutMin = 0` is

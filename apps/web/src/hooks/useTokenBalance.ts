@@ -22,7 +22,9 @@ export function useTokenBalance(token: Token | undefined) {
     query: {enabled: Boolean(address && token && !token.isNative), refetchInterval: 12_000},
   });
 
-  if (!token || !address) return {value: undefined as bigint | undefined, refetch: () => {}};
-  if (token.isNative) return {value: native.data?.value, refetch: native.refetch};
-  return {value: erc20.data as bigint | undefined, refetch: erc20.refetch};
+  if (!token || !address) {
+    return {value: undefined as bigint | undefined, isLoading: false, refetch: () => {}};
+  }
+  if (token.isNative) return {value: native.data?.value, isLoading: native.isLoading, refetch: native.refetch};
+  return {value: erc20.data as bigint | undefined, isLoading: erc20.isLoading, refetch: erc20.refetch};
 }

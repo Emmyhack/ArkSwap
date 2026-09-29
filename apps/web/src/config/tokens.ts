@@ -11,8 +11,11 @@ import {WKASH_ADDRESS} from './contracts';
  * `isDevnetMock` drives a mandatory "no real value" badge. mUSDC and mUSDT are
  * NOT USD Coin or Tether: they are unrestricted-mint devnet fixtures and must
  * never be presented as real-world stablecoins (llm.txt s15).
+ *
+ * `isImported` marks a token the user added by address. It is never in the
+ * manifest, carries no review, and is badged "unverified" wherever it appears.
  */
-export type Token = TokenConfig;
+export type Token = TokenConfig & {isImported?: boolean};
 
 const REGISTRY = tokenRegistry(ARK_CHAIN_ID);
 
@@ -47,6 +50,9 @@ export const TOKEN_LIST: Token[] = REGISTRY.filter((t) => t.isNative || Boolean(
  */
 export const COMMON_TOKENS: Token[] = TOKEN_LIST.slice(0, 5);
 
+/** Manifest tokens flagged as devnet fixtures with an open faucet mint. */
+export const DEVNET_MOCK_TOKENS: Token[] = TOKEN_LIST.filter((t) => t.isDevnetMock && t.address);
+
 export function tokenKey(token: Token): string {
   return token.isNative ? 'NATIVE' : (token.address as string).toLowerCase();
 }
@@ -61,4 +67,32 @@ export function sameToken(a: Token, b: Token): boolean {
  */
 export function routedAddress(token: Token): Address | undefined {
   return token.isNative ? WKASH_ADDRESS : (token.address as Address | undefined);
+}
+
+/** Finds a token in `list` by ERC-20 address (case-insensitive). */
+export function tokenByAddress(list: Token[], address: string | undefined): Token | undefined {
+  if (!address) return undefined;
+  const a = address.toLowerCase();
+  return list.find((t) => t.address?.toLowerCase() === a);
+}
+
+/**
+ * Resolves a URL or search identifier — a symbol like `mUSDC` or a 0x address —
+ * to a token in `list`. Symbols are matched case-insensitively; `KASH` and
+ * `WKASH` stay distinct.
+ */
+export function resolveToken(list: Token[], id: string | null | undefined): Token | undefined {
+  if (!id) return undefined;
+  const q = id.trim();
+  if (!q) return undefined;
+  if (/^0x[0-9a-fA-F]{40}$/.test(q)) return tokenByAddress(list, q);
+  const s = q.toLowerCase();
+  return list.find((t) => t.symbol.toLowerCase() === s);
+}
+
+/** Stable identifier for a token in a URL: its symbol when listed, else its address. */
+export function tokenParam(token: Token): string {
+  if (token.isNative) return token.symbol;
+  if (token.isImported && token.address) return token.address;
+  return token.symbol;
 }

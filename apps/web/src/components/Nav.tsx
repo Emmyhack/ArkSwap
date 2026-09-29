@@ -48,7 +48,7 @@ export function Nav() {
         <Link href="/swap" className="nav__brand">
           <span className="nav__mark" aria-hidden>
             <svg width="15" height="15" viewBox="0 0 32 32" fill="none">
-              <path d="M16 5 L26 27 H20 L16 18 L12 27 H6 Z" fill="white" />
+              <path d="M16 5 L26 27 H20 L16 18 L12 27 H6 Z" fill="currentColor" />
             </svg>
           </span>
           ArkSwap

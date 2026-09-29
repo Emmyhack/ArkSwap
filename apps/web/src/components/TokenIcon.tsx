@@ -6,17 +6,18 @@ import type {Token} from '@/config/tokens';
  * and impossible to confuse with an official asset.
  */
 const KNOWN: Record<string, [string, string]> = {
-  KASH: ['#c48bff', '#7c3aed'],
-  WKASH: ['#a855f7', '#5b21b6'],
-  mUSDC: ['#5aa9ff', '#1e4fd8'],
-  mUSDT: ['#3ecf8e', '#0f7a55'],
+  KASH: ['#f2f2f2', '#8a8a8a'],
+  WKASH: ['#c8c8c8', '#5c5c5c'],
+  mUSDC: ['#a6a6a6', '#3d3d3d'],
+  mUSDT: ['#7d7d7d', '#2a2a2a'],
 };
 
 function gradientFor(symbol: string): [string, string] {
   if (KNOWN[symbol]) return KNOWN[symbol];
   let h = 0;
   for (let i = 0; i < symbol.length; i++) h = (h * 31 + symbol.charCodeAt(i)) % 360;
-  return [`hsl(${h} 80% 68%)`, `hsl(${(h + 40) % 360} 72% 42%)`];
+  const l = 52 + (h % 30);
+  return [`hsl(0 0% ${l}%)`, `hsl(0 0% ${Math.max(l - 38, 12)}%)`];
 }
 
 export function TokenIcon({token, size = 26}: {token: Token; size?: number}) {

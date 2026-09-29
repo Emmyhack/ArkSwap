@@ -7,7 +7,7 @@ export function ConnectSection() {
     <section className="section">
       <h2 className="section__title">Connect with us</h2>
       <div className="grid-3">
-        <div className="feature" style={{minHeight: 220, '--tint': 'rgba(168,85,247,0.16)', '--pill': '#c48bff'} as React.CSSProperties}>
+        <div className="feature" style={{minHeight: 220, '--tint': 'rgba(255,255,255,0.08)', '--pill': '#f0f0f0'} as React.CSSProperties}>
           <a className="feature__pill" href={`${REPO}/issues`} target="_blank" rel="noreferrer">
             ? Support
           </a>
@@ -16,7 +16,7 @@ export function ConnectSection() {
           </h3>
         </div>
 
-        <div className="feature" style={{minHeight: 220, '--tint': 'rgba(139,92,246,0.16)', '--pill': '#b39cff'} as React.CSSProperties}>
+        <div className="feature" style={{minHeight: 220, '--tint': 'rgba(255,255,255,0.08)', '--pill': '#f0f0f0'} as React.CSSProperties}>
           <a className="feature__pill" href={`${REPO}/tree/main/docs`} target="_blank" rel="noreferrer">
             ▤ Docs
           </a>
@@ -25,7 +25,7 @@ export function ConnectSection() {
           </h3>
         </div>
 
-        <div className="feature" style={{minHeight: 220, '--tint': 'rgba(217,70,239,0.16)', '--pill': '#f0a6ff'} as React.CSSProperties}>
+        <div className="feature" style={{minHeight: 220, '--tint': 'rgba(255,255,255,0.08)', '--pill': '#f0f0f0'} as React.CSSProperties}>
           <a
             className="feature__pill"
             href={ARK_BLOCKSCOUT_URL ?? REPO}

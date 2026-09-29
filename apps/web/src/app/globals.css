@@ -1,38 +1,42 @@
-/* ArkSwap design system — black + purple.
+/* ArkSwap design system — metallic black + white.
    Layout language follows the familiar Uniswap-style swap journey (llm.txt s50):
    hero headline, centered swap card, prominent CTA. Branding, palette and marks
    are ArkSwap's own; no Uniswap trademarks or assets are used. */
 
 :root {
-  --bg: #08070d;
-  --bg-soft: #0c0a13;
-  --surface: #15111f;
-  --surface-2: #1c1729;
-  --surface-3: #241d34;
-  --border: #241d33;
-  --border-strong: #362b4d;
+  --bg: #050505;
+  --bg-soft: #0a0a0a;
+  --surface: #111111;
+  --surface-2: #181818;
+  --surface-3: #202020;
+  --border: #262626;
+  --border-strong: #3a3a3a;
 
-  --text: #f5f2fb;
-  --muted: #9c93b4;
-  --faint: #6b6383;
+  --text: #f5f5f5;
+  --muted: #9a9a9a;
+  --faint: #666666;
 
-  --accent: #a855f7;
-  --accent-hi: #c48bff;
-  --accent-deep: #7c3aed;
-  --accent-tint: rgba(168, 85, 247, 0.13);
-  --accent-tint-2: rgba(168, 85, 247, 0.22);
+  /* Metallic silver accent: brushed-steel gradient with a white highlight. */
+  --accent: #d6d6d6;
+  --accent-hi: #ffffff;
+  --accent-deep: #8c8c8c;
+  --accent-tint: rgba(255, 255, 255, 0.08);
+  --accent-tint-2: rgba(255, 255, 255, 0.14);
+  --metal: linear-gradient(150deg, #ffffff 0%, #c9c9c9 28%, #f2f2f2 48%, #9a9a9a 72%, #dcdcdc 100%);
+  --metal-dark: linear-gradient(150deg, #3a3a3a 0%, #1a1a1a 45%, #2e2e2e 70%, #141414 100%);
+  --on-metal: #0a0a0a;
 
-  --danger: #ff5f7e;
-  --danger-tint: rgba(255, 95, 126, 0.12);
-  --warn: #ffb454;
-  --warn-tint: rgba(255, 180, 84, 0.12);
+  --danger: #ff6b6b;
+  --danger-tint: rgba(255, 107, 107, 0.12);
+  --warn: #e0c47a;
+  --warn-tint: rgba(224, 196, 122, 0.12);
 
   --r-card: 24px;
   --r-field: 20px;
   --r-pill: 999px;
 
-  --shadow-card: 0 24px 70px -20px rgba(0, 0, 0, 0.85), 0 0 0 1px var(--border);
-  --shadow-glow: 0 0 44px -8px rgba(168, 85, 247, 0.4);
+  --shadow-card: 0 24px 70px -20px rgba(0, 0, 0, 0.9), 0 0 0 1px var(--border), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --shadow-glow: 0 0 40px -8px rgba(255, 255, 255, 0.28);
 }
 
 * { box-sizing: border-box; }
@@ -100,8 +104,9 @@ button { font-family: inherit; }
   width: 28px;
   height: 28px;
   border-radius: 9px;
-  background: linear-gradient(150deg, var(--accent-hi), var(--accent-deep));
+  background: var(--metal);
   box-shadow: var(--shadow-glow);
+  color: var(--on-metal);
   display: grid;
   place-items: center;
   flex: none;
@@ -165,7 +170,7 @@ button { font-family: inherit; }
 }
 .hero__title em {
   font-style: normal;
-  background: linear-gradient(100deg, var(--accent-hi), var(--accent-deep));
+  background: var(--metal);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -192,7 +197,7 @@ button { font-family: inherit; }
 .page { position: relative; z-index: 1; max-width: 520px; margin: 40px auto; padding: 0 16px; }
 
 .card {
-  background: var(--surface);
+  background: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0) 40%), var(--surface);
   border-radius: var(--r-card);
   padding: 8px;
   box-shadow: var(--shadow-card);
@@ -231,7 +236,7 @@ button { font-family: inherit; }
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
 }
-.field__input::placeholder { color: #3a3450; }
+.field__input::placeholder { color: #3d3d3d; }
 .field__input:read-only { cursor: default; }
 .field__foot {
   display: flex;
@@ -275,12 +280,13 @@ button { font-family: inherit; }
   place-items: center;
   transition: background 0.15s, color 0.15s;
 }
-.switch button:hover { background: var(--accent-deep); }
+.switch button:hover { background: var(--metal); color: var(--on-metal); }
 .switch button[data-static='true'] { cursor: default; }
 .switch button[data-static='true']:hover { background: var(--surface-3); }
 
 /* ----------------------------------------------------------- token pill --- */
 .token-pill {
+  background-image: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0));
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -297,15 +303,15 @@ button { font-family: inherit; }
 }
 .token-pill:hover { border-color: var(--accent); }
 .token-pill--empty {
-  background: linear-gradient(140deg, var(--accent), var(--accent-deep));
+  background: var(--metal);
   border-color: transparent;
-  color: #fff;
+  color: var(--on-metal);
   padding-left: 14px;
   box-shadow: var(--shadow-glow);
 }
 .token-pill--empty:hover { filter: brightness(1.08); border-color: transparent; }
 .token-pill__chev { color: var(--muted); font-size: 11px; }
-.token-pill--empty .token-pill__chev { color: rgba(255,255,255,0.85); }
+.token-pill--empty .token-pill__chev { color: rgba(0,0,0,0.65); }
 
 .token-icon {
   width: 26px;
@@ -335,8 +341,8 @@ button { font-family: inherit; }
   transition: background 0.15s, color 0.15s;
 }
 .btn:hover:not(:disabled) { background: var(--accent-tint-2); }
-.btn--primary { background: linear-gradient(140deg, var(--accent), var(--accent-deep)); color: #fff; }
-.btn--primary:hover:not(:disabled) { filter: brightness(1.08); background: linear-gradient(140deg, var(--accent), var(--accent-deep)); }
+.btn--primary { background: var(--metal); color: var(--on-metal); box-shadow: var(--shadow-glow); }
+.btn--primary:hover:not(:disabled) { filter: brightness(1.06); background: var(--metal); }
 .btn--danger { background: var(--danger-tint); color: var(--danger); }
 .btn:disabled { background: var(--surface-2); color: var(--faint); cursor: not-allowed; }
 .btn--sm { padding: 14px; font-size: 15px; margin-top: 6px; }
@@ -460,7 +466,7 @@ button { font-family: inherit; }
 .modal {
   position: fixed;
   inset: 0;
-  background: rgba(4, 3, 8, 0.72);
+  background: rgba(0, 0, 0, 0.74);
   backdrop-filter: blur(6px);
   display: grid;
   place-items: center;
@@ -639,7 +645,7 @@ button { font-family: inherit; }
   border-radius: 28px;
   padding: 26px;
   background:
-    radial-gradient(120% 100% at 0% 0%, var(--tint, rgba(168,85,247,0.16)), transparent 62%),
+    radial-gradient(120% 100% at 0% 0%, var(--tint, rgba(255,255,255,0.07)), transparent 62%),
     var(--surface);
   border: 1px solid var(--border);
   min-height: 300px;

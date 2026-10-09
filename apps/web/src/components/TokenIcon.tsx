@@ -20,8 +20,23 @@ function gradientFor(symbol: string): [string, string] {
   return [`hsl(0 0% ${l}%)`, `hsl(0 0% ${Math.max(l - 38, 12)}%)`];
 }
 
+/** Relative luminance of a hex or greyscale hsl colour, 0..1. */
+function luminance(color: string): number {
+  const hex = /^#([0-9a-f]{6})$/i.exec(color);
+  if (hex) {
+    const n = parseInt(hex[1], 16);
+    const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) => c / 255);
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  }
+  const hsl = /hsl\(\d+ \d+% (\d+)%\)/.exec(color);
+  return hsl ? Number(hsl[1]) / 100 : 0.3;
+}
+
 export function TokenIcon({token, size = 26}: {token: Token; size?: number}) {
   const [from, to] = gradientFor(token.symbol);
+  // Initials sit on the gradient's average brightness; light silver marks get
+  // dark text, graphite marks keep white, so every mark reads in both themes.
+  const light = (luminance(from) + luminance(to)) / 2 > 0.55;
   return (
     <span
       className="token-icon"
@@ -29,6 +44,7 @@ export function TokenIcon({token, size = 26}: {token: Token; size?: number}) {
         width: size,
         height: size,
         background: `linear-gradient(140deg, ${from}, ${to})`,
+        color: light ? '#0a0a0a' : '#ffffff',
         fontSize: size * 0.4,
       }}
       aria-hidden="true"

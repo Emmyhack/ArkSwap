@@ -3,6 +3,7 @@
 import type {Token} from '@/config/tokens';
 import {formatAmount} from '@/lib/format';
 
+import {Skeleton} from './Skeleton';
 import {TokenSelect} from './TokenSelect';
 
 export function AmountField({
@@ -11,7 +12,9 @@ export function AmountField({
   exclude,
   value,
   balance,
+  balanceLoading,
   readOnly,
+  loading,
   hint,
   onValueChange,
   onTokenChange,
@@ -21,56 +24,70 @@ export function AmountField({
   exclude?: Token;
   value: string;
   balance?: bigint;
+  balanceLoading?: boolean;
   readOnly?: boolean;
+  /** The value is being derived from a quote: show a shimmer instead of a stale number. */
+  loading?: boolean;
   hint?: string;
   onValueChange?: (value: string) => void;
   onTokenChange: (token: Token) => void;
 }) {
   return (
-    <div className="field">
+    <div className="field" data-loading={loading || undefined}>
       <div className="field__label">{label}</div>
       <div className="field__row">
-        <input
-          className="field__input mono"
-          inputMode="decimal"
-          placeholder="0"
-          value={value}
-          readOnly={readOnly}
-          onChange={(e) => onValueChange?.(e.target.value)}
-          aria-label={label}
-        />
+        {loading ? (
+          <span className="field__input field__input--skeleton" aria-label={`${label} (calculating)`}>
+            <Skeleton width="55%" height={30} />
+          </span>
+        ) : (
+          <input
+            className="field__input mono"
+            inputMode="decimal"
+            placeholder="0"
+            value={value}
+            readOnly={readOnly}
+            onChange={(e) => onValueChange?.(e.target.value)}
+            aria-label={label}
+          />
+        )}
         <TokenSelect value={token} exclude={exclude} onChange={onTokenChange} />
       </div>
       <div className="field__foot">
         <span>
           {token.isDevnetMock && <span className="badge badge--devnet">devnet · no real value</span>}
-          {hint && !token.isDevnetMock && hint}
+          {token.isImported && <span className="badge badge--warn">unverified · imported</span>}
+          {hint && !token.isDevnetMock && !token.isImported && hint}
         </span>
-        {balance !== undefined && (
-          <span>
-            Balance: {formatAmount(balance, token.decimals)}
-            {!readOnly && onValueChange && (
-              <>
-                {' '}
-                <button
-                  type="button"
-                  className="field__max"
-                  onClick={() =>
-                    // Native KASH deliberately fills only 99%, leaving gas behind.
-                    onValueChange(
-                      formatAmount(
-                        token.isNative ? (balance * 99n) / 100n : balance,
-                        token.decimals,
-                        token.decimals,
-                      ),
-                    )
-                  }
-                >
-                  Max
-                </button>
-              </>
-            )}
-          </span>
+        {balanceLoading && balance === undefined ? (
+          <Skeleton width={96} height={12} />
+        ) : (
+          balance !== undefined && (
+            <span>
+              Balance: {formatAmount(balance, token.decimals)}
+              {!readOnly && onValueChange && (
+                <>
+                  {' '}
+                  <button
+                    type="button"
+                    className="field__max"
+                    onClick={() =>
+                      // Native KASH deliberately fills only 99%, leaving gas behind.
+                      onValueChange(
+                        formatAmount(
+                          token.isNative ? (balance * 99n) / 100n : balance,
+                          token.decimals,
+                          token.decimals,
+                        ),
+                      )
+                    }
+                  >
+                    Max
+                  </button>
+                </>
+              )}
+            </span>
+          )
         )}
       </div>
     </div>

@@ -12,7 +12,7 @@ export function Footer() {
           <div className="nav__brand" style={{marginBottom: 18}}>
             <span className="nav__mark" aria-hidden>
               <svg width="15" height="15" viewBox="0 0 32 32" fill="none">
-                <path d="M16 5 L26 27 H20 L16 18 L12 27 H6 Z" fill="white" />
+                <path d="M16 5 L26 27 H20 L16 18 L12 27 H6 Z" fill="currentColor" />
               </svg>
             </span>
             ArkSwap
@@ -39,6 +39,7 @@ export function Footer() {
             <h4>App</h4>
             <Link href="/swap">Trade</Link>
             <Link href="/pool">Pool</Link>
+            <Link href="/pools">Explore pools</Link>
           </div>
           <div className="footer__col">
             <h4>Protocol</h4>
